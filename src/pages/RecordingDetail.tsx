@@ -3,6 +3,7 @@ import { motion } from 'framer-motion';
 import { ChevronLeft, Pin, Share2, MoreVertical, Trash2, Edit3 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Tabs, TabsList, TabsTrigger, TabsContent } from '@/components/ui/tabs';
+import { ScrollArea, ScrollBar } from '@/components/ui/scroll-area';
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -54,6 +55,17 @@ export default function RecordingDetail() {
       description: 'Sharing functionality coming soon!',
     });
   };
+
+  const tabs = [
+    { value: 'audio', label: 'Audio' },
+    { value: 'transcript', label: 'Transcript' },
+    { value: 'chapters', label: 'Chapters' },
+    { value: 'checkpoints', label: 'Checkpoints' },
+    { value: 'summary', label: 'Summary' },
+    { value: 'translate', label: 'Translate' },
+    { value: 'quotes', label: 'Quotes' },
+    { value: 'highlights', label: 'Highlights' },
+  ];
 
   return (
     <div className="min-h-screen bg-background">
@@ -121,62 +133,51 @@ export default function RecordingDetail() {
       {/* Content */}
       <main className="p-4 pb-24">
         <Tabs defaultValue="audio" className="w-full">
-          <TabsList className="w-full overflow-x-auto flex justify-start gap-1 mb-6 bg-transparent p-0 h-auto">
-            <TabsTrigger value="audio" className="data-[state=active]:bg-primary data-[state=active]:text-primary-foreground rounded-full px-4 py-2 text-sm">
-              Audio
-            </TabsTrigger>
-            <TabsTrigger value="transcript" className="data-[state=active]:bg-primary data-[state=active]:text-primary-foreground rounded-full px-4 py-2 text-sm">
-              Transcript
-            </TabsTrigger>
-            <TabsTrigger value="chapters" className="data-[state=active]:bg-primary data-[state=active]:text-primary-foreground rounded-full px-4 py-2 text-sm">
-              Chapters
-            </TabsTrigger>
-            <TabsTrigger value="checkpoints" className="data-[state=active]:bg-primary data-[state=active]:text-primary-foreground rounded-full px-4 py-2 text-sm">
-              Checkpoints
-            </TabsTrigger>
-            <TabsTrigger value="summary" className="data-[state=active]:bg-primary data-[state=active]:text-primary-foreground rounded-full px-4 py-2 text-sm">
-              Summary
-            </TabsTrigger>
-            <TabsTrigger value="translate" className="data-[state=active]:bg-primary data-[state=active]:text-primary-foreground rounded-full px-4 py-2 text-sm">
-              Translate
-            </TabsTrigger>
-            <TabsTrigger value="quotes" className="data-[state=active]:bg-primary data-[state=active]:text-primary-foreground rounded-full px-4 py-2 text-sm">
-              Quotes
-            </TabsTrigger>
-            <TabsTrigger value="highlights" className="data-[state=active]:bg-primary data-[state=active]:text-primary-foreground rounded-full px-4 py-2 text-sm">
-              Highlights
-            </TabsTrigger>
-          </TabsList>
+          {/* Scrollable tab list */}
+          <ScrollArea className="w-full whitespace-nowrap mb-6">
+            <TabsList className="inline-flex w-max gap-1 bg-transparent p-0 h-auto">
+              {tabs.map((tab) => (
+                <TabsTrigger
+                  key={tab.value}
+                  value={tab.value}
+                  className="data-[state=active]:bg-primary data-[state=active]:text-primary-foreground rounded-full px-4 py-2 text-sm font-medium transition-all"
+                >
+                  {tab.label}
+                </TabsTrigger>
+              ))}
+            </TabsList>
+            <ScrollBar orientation="horizontal" className="invisible" />
+          </ScrollArea>
 
-          <TabsContent value="audio">
+          <TabsContent value="audio" className="mt-0 animate-fade-in">
             <AudioPlayer duration={recording.duration} />
           </TabsContent>
 
-          <TabsContent value="transcript">
+          <TabsContent value="transcript" className="mt-0 animate-fade-in">
             <TranscriptView transcript={recording.transcript} />
           </TabsContent>
 
-          <TabsContent value="chapters">
+          <TabsContent value="chapters" className="mt-0 animate-fade-in">
             <ChaptersView chapters={recording.chapters} />
           </TabsContent>
 
-          <TabsContent value="checkpoints">
+          <TabsContent value="checkpoints" className="mt-0 animate-fade-in">
             <CheckpointsView checkpoints={recording.checkpoints} />
           </TabsContent>
 
-          <TabsContent value="summary">
+          <TabsContent value="summary" className="mt-0 animate-fade-in">
             <SummaryView summary={recording.summary} />
           </TabsContent>
 
-          <TabsContent value="translate">
+          <TabsContent value="translate" className="mt-0 animate-fade-in">
             <TranslateView transcript={recording.transcript} />
           </TabsContent>
 
-          <TabsContent value="quotes">
+          <TabsContent value="quotes" className="mt-0 animate-fade-in">
             <QuoteCardsView quoteCards={recording.quoteCards} />
           </TabsContent>
 
-          <TabsContent value="highlights">
+          <TabsContent value="highlights" className="mt-0 animate-fade-in">
             <HighlightReelView highlightReel={recording.highlightReel} duration={recording.duration} />
           </TabsContent>
         </Tabs>

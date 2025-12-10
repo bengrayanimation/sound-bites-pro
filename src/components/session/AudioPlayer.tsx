@@ -1,6 +1,6 @@
 import { useState } from 'react';
 import { motion } from 'framer-motion';
-import { Play, Pause, SkipBack, SkipForward } from 'lucide-react';
+import { Play, Pause, SkipBack, SkipForward, Volume2 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Slider } from '@/components/ui/slider';
 import { formatTime } from '@/lib/formatters';
@@ -29,29 +29,55 @@ export function AudioPlayer({ duration, currentTime = 0, onSeek }: AudioPlayerPr
     onSeek?.(value[0]);
   };
 
-  // Generate waveform bars
-  const waveformBars = Array.from({ length: 50 }, (_, i) => ({
-    height: 20 + Math.random() * 60,
-    played: (i / 50) * duration <= position,
-  }));
+  const skipBackward = () => {
+    setPosition(Math.max(0, position - 15));
+  };
+
+  const skipForward = () => {
+    setPosition(Math.min(duration, position + 15));
+  };
+
+  // Generate waveform bars with varied heights
+  const waveformBars = Array.from({ length: 60 }, (_, i) => {
+    const seed = Math.sin(i * 0.5) * 0.5 + 0.5;
+    return {
+      height: 15 + seed * 70,
+      played: (i / 60) * duration <= position,
+    };
+  });
 
   return (
-    <div className="space-y-6">
+    <div className="space-y-8">
       {/* Waveform visualization */}
-      <div className="relative h-24 flex items-center gap-0.5 px-4 bg-muted/50 rounded-xl overflow-hidden">
+      <motion.div 
+        initial={{ opacity: 0, y: 10 }}
+        animate={{ opacity: 1, y: 0 }}
+        className="relative h-28 flex items-center gap-[2px] px-2 bg-muted/30 rounded-2xl overflow-hidden"
+      >
         {waveformBars.map((bar, i) => (
           <motion.div
             key={i}
-            className={`w-1 rounded-full transition-colors ${
-              bar.played ? 'bg-primary' : 'bg-muted-foreground/30'
+            initial={{ scaleY: 0 }}
+            animate={{ scaleY: 1 }}
+            transition={{ delay: i * 0.01, duration: 0.3 }}
+            className={`flex-1 min-w-[2px] max-w-[4px] rounded-full transition-colors duration-150 ${
+              bar.played ? 'bg-primary' : 'bg-muted-foreground/20'
             }`}
             style={{ height: `${bar.height}%` }}
           />
         ))}
-      </div>
+        
+        {/* Playhead indicator */}
+        <motion.div
+          className="absolute top-0 bottom-0 w-0.5 bg-primary shadow-lg"
+          style={{ left: `${(position / duration) * 100}%` }}
+          animate={{ left: `${(position / duration) * 100}%` }}
+          transition={{ type: 'spring', stiffness: 300, damping: 30 }}
+        />
+      </motion.div>
 
       {/* Progress slider */}
-      <div className="space-y-2">
+      <div className="space-y-2 px-2">
         <Slider
           value={[position]}
           max={duration}
@@ -59,53 +85,67 @@ export function AudioPlayer({ duration, currentTime = 0, onSeek }: AudioPlayerPr
           onValueChange={handleSeek}
           className="cursor-pointer"
         />
-        <div className="flex justify-between text-xs text-muted-foreground">
+        <div className="flex justify-between text-xs text-muted-foreground font-medium">
           <span>{formatTime(position)}</span>
-          <span>{formatTime(duration)}</span>
+          <span>-{formatTime(duration - position)}</span>
         </div>
       </div>
 
       {/* Controls */}
-      <div className="flex items-center justify-center gap-4">
+      <div className="flex items-center justify-center gap-6">
         <Button
           variant="ghost"
           size="icon"
-          onClick={() => setPosition(Math.max(0, position - 15))}
+          onClick={skipBackward}
+          className="relative"
         >
-          <SkipBack className="w-5 h-5" />
+          <SkipBack className="w-6 h-6" />
+          <span className="absolute -bottom-1 text-[10px] font-semibold text-muted-foreground">15</span>
         </Button>
 
-        <Button
-          variant="default"
-          size="icon"
-          className="w-14 h-14 rounded-full"
-          onClick={() => setIsPlaying(!isPlaying)}
-        >
-          {isPlaying ? (
-            <Pause className="w-6 h-6 fill-current" />
-          ) : (
-            <Play className="w-6 h-6 fill-current ml-0.5" />
-          )}
-        </Button>
+        <motion.div whileTap={{ scale: 0.95 }}>
+          <Button
+            variant="default"
+            size="icon"
+            className="w-16 h-16 rounded-full shadow-record"
+            onClick={() => setIsPlaying(!isPlaying)}
+          >
+            {isPlaying ? (
+              <Pause className="w-7 h-7 fill-current" />
+            ) : (
+              <Play className="w-7 h-7 fill-current ml-1" />
+            )}
+          </Button>
+        </motion.div>
 
         <Button
           variant="ghost"
           size="icon"
-          onClick={() => setPosition(Math.min(duration, position + 15))}
+          onClick={skipForward}
+          className="relative"
         >
-          <SkipForward className="w-5 h-5" />
+          <SkipForward className="w-6 h-6" />
+          <span className="absolute -bottom-1 text-[10px] font-semibold text-muted-foreground">15</span>
         </Button>
       </div>
 
-      {/* Playback speed */}
-      <div className="flex justify-center">
+      {/* Playback options */}
+      <div className="flex items-center justify-center gap-3">
         <Button
           variant="secondary"
           size="sm"
           onClick={handleSpeedChange}
-          className="text-xs font-semibold"
+          className="text-xs font-semibold min-w-[80px]"
         >
-          {playbackSpeed}x Speed
+          {playbackSpeed}× Speed
+        </Button>
+        
+        <Button
+          variant="ghost"
+          size="icon"
+          className="w-9 h-9"
+        >
+          <Volume2 className="w-4 h-4" />
         </Button>
       </div>
     </div>

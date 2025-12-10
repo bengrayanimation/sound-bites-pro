@@ -1,6 +1,6 @@
 import { useState } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
-import { Quote, Share2, Download, ChevronLeft, ChevronRight, Sparkles, Lock } from 'lucide-react';
+import { Quote, Share2, Download, ChevronLeft, ChevronRight, Lock, Palette } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { QuoteCard } from '@/types/recording';
 import { formatTime } from '@/lib/formatters';
@@ -16,24 +16,28 @@ const styleConfig = {
     border: 'border-border',
     text: 'text-foreground',
     accent: 'text-primary',
+    label: 'Minimal',
   },
   bold: {
     bg: 'bg-foreground',
     border: 'border-transparent',
     text: 'text-background',
     accent: 'text-primary',
+    label: 'Bold',
   },
   corporate: {
     bg: 'bg-gradient-to-br from-slate-800 to-slate-900',
     border: 'border-transparent',
     text: 'text-white',
-    accent: 'text-primary',
+    accent: 'text-amber-400',
+    label: 'Corporate',
   },
   student: {
     bg: 'bg-gradient-to-br from-amber-50 to-orange-50',
     border: 'border-primary/20',
     text: 'text-foreground',
     accent: 'text-primary',
+    label: 'Student',
   },
 };
 
@@ -44,15 +48,18 @@ export function QuoteCardsView({ quoteCards }: QuoteCardsViewProps) {
   if (!isPro) {
     return (
       <div className="flex flex-col items-center justify-center py-16 text-center">
-        <div className="w-16 h-16 rounded-full bg-primary/10 flex items-center justify-center mb-4">
-          <Lock className="w-8 h-8 text-primary" />
-        </div>
-        <h3 className="font-semibold text-foreground mb-2">Pro Feature</h3>
-        <p className="text-sm text-muted-foreground max-w-xs mb-4">
+        <motion.div
+          initial={{ scale: 0.9, opacity: 0 }}
+          animate={{ scale: 1, opacity: 1 }}
+          className="w-20 h-20 rounded-2xl bg-gradient-to-br from-primary/20 to-primary/10 flex items-center justify-center mb-6"
+        >
+          <Lock className="w-10 h-10 text-primary" />
+        </motion.div>
+        <h3 className="font-bold text-xl text-foreground mb-2">Pro Feature</h3>
+        <p className="text-sm text-muted-foreground max-w-xs mb-6">
           Stylised quote cards are available with a Pro subscription
         </p>
-        <Button>
-          <Sparkles className="w-4 h-4 mr-2" />
+        <Button className="shadow-record">
           Upgrade to Pro
         </Button>
       </div>
@@ -86,24 +93,37 @@ export function QuoteCardsView({ quoteCards }: QuoteCardsViewProps) {
 
   return (
     <div className="space-y-6">
+      {/* Style indicator */}
+      <div className="flex items-center justify-center gap-2">
+        <Palette className="w-4 h-4 text-muted-foreground" />
+        <span className="text-sm font-medium text-muted-foreground">{style.label} Style</span>
+      </div>
+
       {/* Card display */}
       <div className="relative">
         <AnimatePresence mode="wait">
           <motion.div
             key={currentCard.id}
-            initial={{ opacity: 0, scale: 0.95 }}
-            animate={{ opacity: 1, scale: 1 }}
-            exit={{ opacity: 0, scale: 0.95 }}
-            className={`${style.bg} ${style.border} border rounded-2xl p-8 min-h-[240px] flex flex-col justify-center`}
+            initial={{ opacity: 0, scale: 0.95, y: 10 }}
+            animate={{ opacity: 1, scale: 1, y: 0 }}
+            exit={{ opacity: 0, scale: 0.95, y: -10 }}
+            transition={{ duration: 0.2 }}
+            className={`${style.bg} ${style.border} border rounded-2xl p-8 min-h-[280px] flex flex-col justify-between shadow-lg`}
           >
-            <Quote className={`w-8 h-8 ${style.accent} mb-4`} />
-            <p className={`text-xl font-medium ${style.text} mb-4 leading-relaxed`}>
+            <Quote className={`w-10 h-10 ${style.accent} opacity-60`} />
+            
+            <p className={`text-2xl font-semibold ${style.text} leading-relaxed my-6`}>
               "{currentCard.quote}"
             </p>
-            <div className={`flex items-center gap-2 ${style.text} opacity-70`}>
-              <span className="text-sm font-medium">{currentCard.speaker}</span>
-              <span className="text-sm">•</span>
-              <span className="text-sm">{formatTime(currentCard.timestamp)}</span>
+            
+            <div className={`flex items-center gap-3 ${style.text}`}>
+              <div className="w-10 h-10 rounded-full bg-current/10 flex items-center justify-center">
+                <span className="text-sm font-bold">{currentCard.speaker.charAt(0)}</span>
+              </div>
+              <div>
+                <p className="font-medium">{currentCard.speaker}</p>
+                <p className="text-sm opacity-60">{formatTime(currentCard.timestamp)}</p>
+              </div>
             </div>
           </motion.div>
         </AnimatePresence>
@@ -113,13 +133,13 @@ export function QuoteCardsView({ quoteCards }: QuoteCardsViewProps) {
           <>
             <button
               onClick={prevCard}
-              className="absolute left-2 top-1/2 -translate-y-1/2 w-10 h-10 rounded-full bg-background/90 border border-border flex items-center justify-center hover:bg-muted transition-colors"
+              className="absolute left-2 top-1/2 -translate-y-1/2 w-10 h-10 rounded-full bg-background/90 border border-border flex items-center justify-center hover:bg-muted transition-colors shadow-md"
             >
               <ChevronLeft className="w-5 h-5" />
             </button>
             <button
               onClick={nextCard}
-              className="absolute right-2 top-1/2 -translate-y-1/2 w-10 h-10 rounded-full bg-background/90 border border-border flex items-center justify-center hover:bg-muted transition-colors"
+              className="absolute right-2 top-1/2 -translate-y-1/2 w-10 h-10 rounded-full bg-background/90 border border-border flex items-center justify-center hover:bg-muted transition-colors shadow-md"
             >
               <ChevronRight className="w-5 h-5" />
             </button>
@@ -134,8 +154,8 @@ export function QuoteCardsView({ quoteCards }: QuoteCardsViewProps) {
             <button
               key={i}
               onClick={() => setCurrentIndex(i)}
-              className={`w-2 h-2 rounded-full transition-colors ${
-                i === currentIndex ? 'bg-primary' : 'bg-muted-foreground/30'
+              className={`w-2.5 h-2.5 rounded-full transition-all duration-200 ${
+                i === currentIndex ? 'bg-primary w-6' : 'bg-muted-foreground/30 hover:bg-muted-foreground/50'
               }`}
             />
           ))}
@@ -150,7 +170,7 @@ export function QuoteCardsView({ quoteCards }: QuoteCardsViewProps) {
         </Button>
         <Button variant="outline" className="flex-1">
           <Download className="w-4 h-4 mr-2" />
-          Export
+          Save Image
         </Button>
       </div>
     </div>
