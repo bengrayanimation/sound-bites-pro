@@ -132,7 +132,19 @@ const demoRecordings: Recording[] = [
     },
     quoteCards: [
       { id: 'q1', quote: "AI-powered features will set us apart from the competition.", speaker: 'Product Lead', timestamp: 250, style: 'bold' },
+      { id: 'q2', quote: "Focus on high-impact, low-effort wins first.", speaker: 'Designer', timestamp: 620, style: 'minimal' },
+      { id: 'q3', quote: "Mobile redesign is critical for user retention.", speaker: 'Product Lead', timestamp: 900, style: 'corporate' },
     ],
+    highlightReel: {
+      id: 'hr2',
+      duration: 60,
+      moments: [
+        { startTime: 0, endTime: 15, caption: 'Feature ideation kickoff' },
+        { startTime: 250, endTime: 270, caption: 'AI features discussion' },
+        { startTime: 600, endTime: 625, caption: 'Prioritization framework' },
+        { startTime: 1100, endTime: 1120, caption: 'Q2 roadmap finalized' },
+      ],
+    },
   },
   {
     id: '3',
@@ -179,8 +191,8 @@ export const useRecordingStore = create<RecordingState>()(
   persist(
     (set, get) => ({
       recordings: demoRecordings,
-      freeRecordingsLeft: 3,
-      isPro: false,
+      freeRecordingsLeft: 999,
+      isPro: true, // Unlocked for testing
       
       addRecording: (recording) => {
         set((state) => ({

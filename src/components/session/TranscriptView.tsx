@@ -1,17 +1,35 @@
 import { useState } from 'react';
 import { motion } from 'framer-motion';
-import { Search, FileText } from 'lucide-react';
+import { Search, FileText, Share2, Download } from 'lucide-react';
 import { Input } from '@/components/ui/input';
+import { Button } from '@/components/ui/button';
 import { TranscriptSegment } from '@/types/recording';
 import { formatTime } from '@/lib/formatters';
+import { shareText, generateTranscriptText, downloadTextFile } from '@/lib/shareUtils';
+import { toast } from 'sonner';
 
 interface TranscriptViewProps {
   transcript?: TranscriptSegment[];
   onTimeClick?: (time: number) => void;
+  title?: string;
 }
 
-export function TranscriptView({ transcript, onTimeClick }: TranscriptViewProps) {
+export function TranscriptView({ transcript, onTimeClick, title = 'Recording' }: TranscriptViewProps) {
   const [searchQuery, setSearchQuery] = useState('');
+
+  const handleShare = async () => {
+    if (!transcript) return;
+    const text = generateTranscriptText(transcript);
+    const shared = await shareText(`Transcript: ${title}`, text);
+    if (shared) toast.success('Transcript shared!');
+  };
+
+  const handleSave = () => {
+    if (!transcript) return;
+    const text = generateTranscriptText(transcript);
+    downloadTextFile(`${title.replace(/\s+/g, '_')}_transcript.txt`, text);
+    toast.success('Transcript saved to device');
+  };
 
   if (!transcript || transcript.length === 0) {
     return (
@@ -58,11 +76,30 @@ export function TranscriptView({ transcript, onTimeClick }: TranscriptViewProps)
             <span className="text-xs font-mono text-primary font-medium min-w-[48px]">
               {formatTime(segment.startTime)}
             </span>
-            <p className="text-sm text-foreground flex-1 group-hover:text-primary transition-colors">
-              {segment.text}
-            </p>
+            <div className="flex-1">
+              {segment.speaker && (
+                <span className="text-xs font-semibold text-muted-foreground mr-2">
+                  {segment.speaker}:
+                </span>
+              )}
+              <span className="text-sm text-foreground group-hover:text-primary transition-colors">
+                {segment.text}
+              </span>
+            </div>
           </motion.button>
         ))}
+      </div>
+
+      {/* Share/Save Actions */}
+      <div className="flex gap-3 pt-4 border-t border-border">
+        <Button variant="outline" className="flex-1" onClick={handleShare}>
+          <Share2 className="w-4 h-4 mr-2" />
+          Share
+        </Button>
+        <Button variant="outline" className="flex-1" onClick={handleSave}>
+          <Download className="w-4 h-4 mr-2" />
+          Save
+        </Button>
       </div>
     </div>
   );
