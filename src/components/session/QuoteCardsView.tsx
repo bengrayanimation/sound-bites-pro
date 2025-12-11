@@ -1,10 +1,16 @@
 import { useState } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
-import { Quote, Share2, Download, ChevronLeft, ChevronRight, Palette } from 'lucide-react';
+import { Quote, Share2, Download, ChevronLeft, ChevronRight, Palette, Image, DownloadCloud } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { QuoteCard } from '@/types/recording';
 import { formatTime } from '@/lib/formatters';
-import { shareText, generateQuoteText, downloadTextFile } from '@/lib/shareUtils';
+import { 
+  shareQuoteAsImage, 
+  downloadQuoteAsImage, 
+  quoteCardStyles,
+  generateQuoteCardImage,
+  downloadFile
+} from '@/lib/shareUtils';
 import { toast } from 'sonner';
 
 interface QuoteCardsViewProps {
@@ -12,54 +18,50 @@ interface QuoteCardsViewProps {
   title?: string;
 }
 
-const styleConfig = {
-  minimal: {
-    bg: 'bg-card',
-    border: 'border-border',
-    text: 'text-foreground',
-    accent: 'text-primary',
-    label: 'Minimal',
-  },
-  bold: {
-    bg: 'bg-foreground',
-    border: 'border-transparent',
-    text: 'text-background',
-    accent: 'text-primary',
-    label: 'Bold',
-  },
-  corporate: {
-    bg: 'bg-gradient-to-br from-slate-800 to-slate-900',
-    border: 'border-transparent',
-    text: 'text-white',
-    accent: 'text-amber-400',
-    label: 'Corporate',
-  },
-  student: {
-    bg: 'bg-gradient-to-br from-amber-50 to-orange-50',
-    border: 'border-primary/20',
-    text: 'text-foreground',
-    accent: 'text-primary',
-    label: 'Student',
-  },
-};
+const styleKeys = Object.keys(quoteCardStyles);
 
 export function QuoteCardsView({ quoteCards, title = 'Recording' }: QuoteCardsViewProps) {
   const [currentIndex, setCurrentIndex] = useState(0);
+  const [currentStyleIndex, setCurrentStyleIndex] = useState(0);
 
   const handleShare = async () => {
     if (!quoteCards || quoteCards.length === 0) return;
     const quote = quoteCards[currentIndex];
-    const text = generateQuoteText(quote);
-    const shared = await shareText(`Quote from ${title}`, text);
+    const styleKey = styleKeys[currentStyleIndex];
+    toast.loading('Generating image...');
+    const shared = await shareQuoteAsImage(quote, styleKey, title);
+    toast.dismiss();
     if (shared) toast.success('Quote shared!');
   };
 
-  const handleSave = () => {
+  const handleSave = async () => {
     if (!quoteCards || quoteCards.length === 0) return;
     const quote = quoteCards[currentIndex];
-    const text = generateQuoteText(quote);
-    downloadTextFile(`${title.replace(/\s+/g, '_')}_quote_${currentIndex + 1}.txt`, text);
-    toast.success('Quote saved to device');
+    const styleKey = styleKeys[currentStyleIndex];
+    toast.loading('Generating image...');
+    await downloadQuoteAsImage(quote, styleKey, `${title.replace(/\s+/g, '_')}_quote_${currentIndex + 1}.png`);
+    toast.dismiss();
+    toast.success('Quote card saved as image');
+  };
+
+  const handleSaveAll = async () => {
+    if (!quoteCards || quoteCards.length === 0) return;
+    toast.loading('Generating all quote cards...');
+    const styleKey = styleKeys[currentStyleIndex];
+    
+    for (let i = 0; i < quoteCards.length; i++) {
+      const blob = await generateQuoteCardImage(quoteCards[i], styleKey);
+      downloadFile(`${title.replace(/\s+/g, '_')}_quote_${i + 1}.png`, blob);
+      // Small delay between downloads
+      await new Promise(resolve => setTimeout(resolve, 300));
+    }
+    
+    toast.dismiss();
+    toast.success(`Saved ${quoteCards.length} quote cards`);
+  };
+
+  const cycleStyle = () => {
+    setCurrentStyleIndex((i) => (i + 1) % styleKeys.length);
   };
 
   if (!quoteCards || quoteCards.length === 0) {
@@ -77,7 +79,8 @@ export function QuoteCardsView({ quoteCards, title = 'Recording' }: QuoteCardsVi
   }
 
   const currentCard = quoteCards[currentIndex];
-  const style = styleConfig[currentCard.style] || styleConfig.minimal;
+  const currentStyleKey = styleKeys[currentStyleIndex];
+  const style = quoteCardStyles[currentStyleKey];
 
   const nextCard = () => {
     setCurrentIndex((i) => (i + 1) % quoteCards.length);
@@ -87,33 +90,100 @@ export function QuoteCardsView({ quoteCards, title = 'Recording' }: QuoteCardsVi
     setCurrentIndex((i) => (i - 1 + quoteCards.length) % quoteCards.length);
   };
 
+  // Dynamic styles based on current style
+  const getCardStyles = () => {
+    switch (currentStyleKey) {
+      case 'minimal':
+        return 'bg-card border-border text-foreground';
+      case 'bold':
+        return 'bg-foreground border-transparent text-background';
+      case 'corporate':
+        return 'bg-gradient-to-br from-slate-800 to-slate-900 border-transparent text-white';
+      case 'student':
+        return 'bg-gradient-to-br from-amber-50 to-orange-100 border-primary/20 text-foreground';
+      case 'ocean':
+        return 'bg-gradient-to-br from-sky-800 to-cyan-900 border-transparent text-white';
+      case 'sunset':
+        return 'bg-gradient-to-br from-orange-900 to-red-900 border-transparent text-white';
+      case 'forest':
+        return 'bg-gradient-to-br from-green-900 to-emerald-900 border-transparent text-white';
+      case 'lavender':
+        return 'bg-gradient-to-br from-purple-900 to-violet-900 border-transparent text-white';
+      default:
+        return 'bg-card border-border text-foreground';
+    }
+  };
+
+  const getAccentColor = () => {
+    switch (currentStyleKey) {
+      case 'minimal':
+      case 'student':
+        return 'text-primary';
+      case 'bold':
+        return 'text-primary';
+      case 'corporate':
+        return 'text-amber-400';
+      case 'ocean':
+        return 'text-sky-400';
+      case 'sunset':
+        return 'text-orange-400';
+      case 'forest':
+        return 'text-green-400';
+      case 'lavender':
+        return 'text-purple-400';
+      default:
+        return 'text-primary';
+    }
+  };
+
   return (
     <div className="space-y-6">
-      {/* Style indicator */}
-      <div className="flex items-center justify-center gap-2">
-        <Palette className="w-4 h-4 text-muted-foreground" />
-        <span className="text-sm font-medium text-muted-foreground">{style.label} Style</span>
+      {/* Style selector */}
+      <div className="flex items-center justify-between">
+        <div className="flex items-center gap-2">
+          <Palette className="w-4 h-4 text-muted-foreground" />
+          <span className="text-sm font-medium text-muted-foreground">{style.label} Style</span>
+        </div>
+        <Button variant="ghost" size="sm" onClick={cycleStyle} className="gap-2">
+          <Image className="w-4 h-4" />
+          Change Style
+        </Button>
+      </div>
+
+      {/* Style preview dots */}
+      <div className="flex justify-center gap-2">
+        {styleKeys.map((key, i) => (
+          <button
+            key={key}
+            onClick={() => setCurrentStyleIndex(i)}
+            className={`w-6 h-6 rounded-full border-2 transition-all ${
+              i === currentStyleIndex ? 'scale-110 ring-2 ring-primary ring-offset-2' : 'opacity-60 hover:opacity-100'
+            }`}
+            style={{ backgroundColor: quoteCardStyles[key].bg, borderColor: quoteCardStyles[key].accentColor }}
+            title={quoteCardStyles[key].label}
+          />
+        ))}
       </div>
 
       {/* Card display */}
       <div className="relative">
         <AnimatePresence mode="wait">
           <motion.div
-            key={currentCard.id}
+            key={`${currentCard.id}-${currentStyleKey}`}
             initial={{ opacity: 0, scale: 0.95, y: 10 }}
             animate={{ opacity: 1, scale: 1, y: 0 }}
             exit={{ opacity: 0, scale: 0.95, y: -10 }}
             transition={{ duration: 0.2 }}
-            className={`${style.bg} ${style.border} border rounded-2xl p-8 min-h-[280px] flex flex-col justify-between shadow-lg`}
+            className={`${getCardStyles()} border rounded-2xl p-8 min-h-[280px] flex flex-col justify-between shadow-lg`}
           >
-            <Quote className={`w-10 h-10 ${style.accent} opacity-60`} />
+            <Quote className={`w-10 h-10 ${getAccentColor()} opacity-60`} />
             
-            <p className={`text-2xl font-semibold ${style.text} leading-relaxed my-6`}>
+            <p className="text-2xl font-semibold leading-relaxed my-6">
               "{currentCard.quote}"
             </p>
             
-            <div className={`flex items-center gap-3 ${style.text}`}>
-              <div className="w-10 h-10 rounded-full bg-current/10 flex items-center justify-center">
+            <div className="flex items-center gap-3">
+              <div className={`w-10 h-10 rounded-full ${currentStyleKey === 'minimal' || currentStyleKey === 'student' ? 'bg-foreground/10' : 'bg-white/10'} flex items-center justify-center`}>
                 <span className="text-sm font-bold">{currentCard.speaker.charAt(0)}</span>
               </div>
               <div>
@@ -159,16 +229,23 @@ export function QuoteCardsView({ quoteCards, title = 'Recording' }: QuoteCardsVi
       )}
 
       {/* Actions */}
-      <div className="flex gap-3">
-        <Button variant="outline" className="flex-1" onClick={handleShare}>
+      <div className="grid grid-cols-2 gap-3">
+        <Button variant="outline" onClick={handleShare}>
           <Share2 className="w-4 h-4 mr-2" />
           Share
         </Button>
-        <Button variant="outline" className="flex-1" onClick={handleSave}>
+        <Button variant="outline" onClick={handleSave}>
           <Download className="w-4 h-4 mr-2" />
           Save
         </Button>
       </div>
+      
+      {quoteCards.length > 1 && (
+        <Button variant="secondary" className="w-full" onClick={handleSaveAll}>
+          <DownloadCloud className="w-4 h-4 mr-2" />
+          Save All ({quoteCards.length} cards)
+        </Button>
+      )}
     </div>
   );
 }

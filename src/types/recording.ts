@@ -56,7 +56,7 @@ export interface QuoteCard {
   quote: string;
   speaker: string;
   timestamp: number;
-  style: 'minimal' | 'bold' | 'corporate' | 'student';
+  style: 'minimal' | 'bold' | 'corporate' | 'student' | 'ocean' | 'sunset' | 'forest' | 'lavender';
 }
 
 export interface HighlightReel {
