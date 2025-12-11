@@ -150,11 +150,11 @@ export default function RecordingDetail() {
           </ScrollArea>
 
           <TabsContent value="audio" className="mt-0 animate-fade-in">
-            <AudioPlayer duration={recording.duration} />
+            <AudioPlayer duration={recording.duration} title={recording.title} />
           </TabsContent>
 
           <TabsContent value="transcript" className="mt-0 animate-fade-in">
-            <TranscriptView transcript={recording.transcript} />
+            <TranscriptView transcript={recording.transcript} title={recording.title} />
           </TabsContent>
 
           <TabsContent value="chapters" className="mt-0 animate-fade-in">
@@ -166,7 +166,7 @@ export default function RecordingDetail() {
           </TabsContent>
 
           <TabsContent value="summary" className="mt-0 animate-fade-in">
-            <SummaryView summary={recording.summary} />
+            <SummaryView summary={recording.summary} title={recording.title} />
           </TabsContent>
 
           <TabsContent value="translate" className="mt-0 animate-fade-in">
@@ -174,11 +174,11 @@ export default function RecordingDetail() {
           </TabsContent>
 
           <TabsContent value="quotes" className="mt-0 animate-fade-in">
-            <QuoteCardsView quoteCards={recording.quoteCards} />
+            <QuoteCardsView quoteCards={recording.quoteCards} title={recording.title} />
           </TabsContent>
 
           <TabsContent value="highlights" className="mt-0 animate-fade-in">
-            <HighlightReelView highlightReel={recording.highlightReel} duration={recording.duration} />
+            <HighlightReelView highlightReel={recording.highlightReel} duration={recording.duration} title={recording.title} />
           </TabsContent>
         </Tabs>
       </main>

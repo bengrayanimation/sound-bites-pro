@@ -1,13 +1,15 @@
 import { useState } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
-import { Quote, Share2, Download, ChevronLeft, ChevronRight, Lock, Palette } from 'lucide-react';
+import { Quote, Share2, Download, ChevronLeft, ChevronRight, Palette } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { QuoteCard } from '@/types/recording';
 import { formatTime } from '@/lib/formatters';
-import { useRecordingStore } from '@/stores/recordingStore';
+import { shareText, generateQuoteText, downloadTextFile } from '@/lib/shareUtils';
+import { toast } from 'sonner';
 
 interface QuoteCardsViewProps {
   quoteCards?: QuoteCard[];
+  title?: string;
 }
 
 const styleConfig = {
@@ -41,30 +43,24 @@ const styleConfig = {
   },
 };
 
-export function QuoteCardsView({ quoteCards }: QuoteCardsViewProps) {
+export function QuoteCardsView({ quoteCards, title = 'Recording' }: QuoteCardsViewProps) {
   const [currentIndex, setCurrentIndex] = useState(0);
-  const { isPro } = useRecordingStore();
 
-  if (!isPro) {
-    return (
-      <div className="flex flex-col items-center justify-center py-16 text-center">
-        <motion.div
-          initial={{ scale: 0.9, opacity: 0 }}
-          animate={{ scale: 1, opacity: 1 }}
-          className="w-20 h-20 rounded-2xl bg-gradient-to-br from-primary/20 to-primary/10 flex items-center justify-center mb-6"
-        >
-          <Lock className="w-10 h-10 text-primary" />
-        </motion.div>
-        <h3 className="font-bold text-xl text-foreground mb-2">Pro Feature</h3>
-        <p className="text-sm text-muted-foreground max-w-xs mb-6">
-          Stylised quote cards are available with a Pro subscription
-        </p>
-        <Button className="shadow-record">
-          Upgrade to Pro
-        </Button>
-      </div>
-    );
-  }
+  const handleShare = async () => {
+    if (!quoteCards || quoteCards.length === 0) return;
+    const quote = quoteCards[currentIndex];
+    const text = generateQuoteText(quote);
+    const shared = await shareText(`Quote from ${title}`, text);
+    if (shared) toast.success('Quote shared!');
+  };
+
+  const handleSave = () => {
+    if (!quoteCards || quoteCards.length === 0) return;
+    const quote = quoteCards[currentIndex];
+    const text = generateQuoteText(quote);
+    downloadTextFile(`${title.replace(/\s+/g, '_')}_quote_${currentIndex + 1}.txt`, text);
+    toast.success('Quote saved to device');
+  };
 
   if (!quoteCards || quoteCards.length === 0) {
     return (
@@ -81,7 +77,7 @@ export function QuoteCardsView({ quoteCards }: QuoteCardsViewProps) {
   }
 
   const currentCard = quoteCards[currentIndex];
-  const style = styleConfig[currentCard.style];
+  const style = styleConfig[currentCard.style] || styleConfig.minimal;
 
   const nextCard = () => {
     setCurrentIndex((i) => (i + 1) % quoteCards.length);
@@ -164,13 +160,13 @@ export function QuoteCardsView({ quoteCards }: QuoteCardsViewProps) {
 
       {/* Actions */}
       <div className="flex gap-3">
-        <Button variant="outline" className="flex-1">
+        <Button variant="outline" className="flex-1" onClick={handleShare}>
           <Share2 className="w-4 h-4 mr-2" />
           Share
         </Button>
-        <Button variant="outline" className="flex-1">
+        <Button variant="outline" className="flex-1" onClick={handleSave}>
           <Download className="w-4 h-4 mr-2" />
-          Save Image
+          Save
         </Button>
       </div>
     </div>

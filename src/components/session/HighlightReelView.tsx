@@ -1,40 +1,40 @@
 import { useState } from 'react';
 import { motion } from 'framer-motion';
-import { Film, Play, Share2, Download, Sparkles, Lock, Pause, Clock } from 'lucide-react';
+import { Film, Play, Share2, Download, Sparkles, Pause, Clock } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { HighlightReel } from '@/types/recording';
 import { formatTime } from '@/lib/formatters';
-import { useRecordingStore } from '@/stores/recordingStore';
+import { shareText, downloadTextFile } from '@/lib/shareUtils';
+import { toast } from 'sonner';
 
 interface HighlightReelViewProps {
   highlightReel?: HighlightReel;
   duration: number;
+  title?: string;
 }
 
-export function HighlightReelView({ highlightReel, duration }: HighlightReelViewProps) {
-  const { isPro } = useRecordingStore();
+export function HighlightReelView({ highlightReel, duration, title = 'Recording' }: HighlightReelViewProps) {
   const [isPlaying, setIsPlaying] = useState(false);
 
-  if (!isPro) {
-    return (
-      <div className="flex flex-col items-center justify-center py-16 text-center">
-        <motion.div
-          initial={{ scale: 0.9, opacity: 0 }}
-          animate={{ scale: 1, opacity: 1 }}
-          className="w-20 h-20 rounded-2xl bg-gradient-to-br from-primary/20 to-primary/10 flex items-center justify-center mb-6"
-        >
-          <Lock className="w-10 h-10 text-primary" />
-        </motion.div>
-        <h3 className="font-bold text-xl text-foreground mb-2">Pro Feature</h3>
-        <p className="text-sm text-muted-foreground max-w-xs mb-6">
-          60-second highlight reels are available with a Pro subscription
-        </p>
-        <Button className="shadow-record">
-          Upgrade to Pro
-        </Button>
-      </div>
-    );
-  }
+  const handleShare = async () => {
+    if (!highlightReel) return;
+    let text = `🎬 Highlight Reel: ${title}\n\nKey Moments:\n`;
+    highlightReel.moments.forEach((m, i) => {
+      text += `${i + 1}. ${m.caption} (${formatTime(m.startTime)} - ${formatTime(m.endTime)})\n`;
+    });
+    const shared = await shareText(`Highlight Reel: ${title}`, text);
+    if (shared) toast.success('Highlight reel shared!');
+  };
+
+  const handleExport = () => {
+    if (!highlightReel) return;
+    let text = `Highlight Reel: ${title}\n\nKey Moments:\n`;
+    highlightReel.moments.forEach((m, i) => {
+      text += `${i + 1}. ${m.caption} (${formatTime(m.startTime)} - ${formatTime(m.endTime)})\n`;
+    });
+    downloadTextFile(`${title.replace(/\s+/g, '_')}_highlight_reel.txt`, text);
+    toast.success('Highlight reel exported');
+  };
 
   if (!highlightReel) {
     return (
@@ -142,11 +142,11 @@ export function HighlightReelView({ highlightReel, duration }: HighlightReelView
 
       {/* Actions */}
       <div className="flex gap-3">
-        <Button variant="outline" className="flex-1">
+        <Button variant="outline" className="flex-1" onClick={handleShare}>
           <Share2 className="w-4 h-4 mr-2" />
           Share Reel
         </Button>
-        <Button variant="outline" className="flex-1">
+        <Button variant="outline" className="flex-1" onClick={handleExport}>
           <Download className="w-4 h-4 mr-2" />
           Export
         </Button>

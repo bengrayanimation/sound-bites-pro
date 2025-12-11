@@ -1,17 +1,20 @@
 import { useState } from 'react';
 import { motion } from 'framer-motion';
-import { Play, Pause, SkipBack, SkipForward, Volume2 } from 'lucide-react';
+import { Play, Pause, SkipBack, SkipForward, Volume2, Share2, Download } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Slider } from '@/components/ui/slider';
 import { formatTime } from '@/lib/formatters';
+import { shareText, downloadTextFile } from '@/lib/shareUtils';
+import { toast } from 'sonner';
 
 interface AudioPlayerProps {
   duration: number;
   currentTime?: number;
   onSeek?: (time: number) => void;
+  title?: string;
 }
 
-export function AudioPlayer({ duration, currentTime = 0, onSeek }: AudioPlayerProps) {
+export function AudioPlayer({ duration, currentTime = 0, onSeek, title = 'Recording' }: AudioPlayerProps) {
   const [isPlaying, setIsPlaying] = useState(false);
   const [playbackSpeed, setPlaybackSpeed] = useState(1);
   const [position, setPosition] = useState(currentTime);
@@ -35,6 +38,18 @@ export function AudioPlayer({ duration, currentTime = 0, onSeek }: AudioPlayerPr
 
   const skipForward = () => {
     setPosition(Math.min(duration, position + 15));
+  };
+
+  const handleShare = async () => {
+    const text = `🎙️ ${title}\nDuration: ${formatTime(duration)}`;
+    const shared = await shareText(`Audio: ${title}`, text);
+    if (shared) toast.success('Audio info shared!');
+  };
+
+  const handleSave = () => {
+    // In a real app, this would save the actual audio file
+    // For demo, we just show a success message
+    toast.success('Audio would be saved to device (demo mode)');
   };
 
   // Generate waveform bars with varied heights
@@ -146,6 +161,18 @@ export function AudioPlayer({ duration, currentTime = 0, onSeek }: AudioPlayerPr
           className="w-9 h-9"
         >
           <Volume2 className="w-4 h-4" />
+        </Button>
+      </div>
+
+      {/* Share/Save Actions */}
+      <div className="flex gap-3 pt-4 border-t border-border">
+        <Button variant="outline" className="flex-1" onClick={handleShare}>
+          <Share2 className="w-4 h-4 mr-2" />
+          Share
+        </Button>
+        <Button variant="outline" className="flex-1" onClick={handleSave}>
+          <Download className="w-4 h-4 mr-2" />
+          Save Audio
         </Button>
       </div>
     </div>
