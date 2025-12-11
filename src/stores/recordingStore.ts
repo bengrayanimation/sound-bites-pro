@@ -14,7 +14,90 @@ interface RecordingState {
   upgradeToPro: () => void;
 }
 
-// Rich demo recordings with full AI features
+// Template for new recordings with all AI features
+export const createRecordingTemplate = (
+  id: string,
+  title: string,
+  duration: number,
+  createdAt: Date,
+  isPinned: boolean = false
+): Recording => ({
+  id,
+  title,
+  duration,
+  createdAt,
+  isPinned,
+  isTranscribed: true,
+  transcript: [
+    { id: 't1', text: "Recording started. This is the beginning of your audio.", startTime: 0, endTime: 5, speaker: 'Speaker 1' },
+    { id: 't2', text: "The AI will automatically transcribe your audio content.", startTime: 5, endTime: 12, speaker: 'Speaker 1' },
+    { id: 't3', text: "All features including chapters, summaries, and quotes will be generated.", startTime: 12, endTime: 20, speaker: 'Speaker 1' },
+  ],
+  chapters: [
+    { 
+      id: 'c1', 
+      title: 'Introduction', 
+      startTime: 0, 
+      endTime: Math.floor(duration / 3), 
+      bullets: ['Opening remarks', 'Context setting'], 
+      keyQuote: "Let's get started." 
+    },
+    { 
+      id: 'c2', 
+      title: 'Main Discussion', 
+      startTime: Math.floor(duration / 3), 
+      endTime: Math.floor(duration * 2 / 3), 
+      bullets: ['Key points covered', 'Important details'], 
+      keyQuote: "This is the key takeaway." 
+    },
+    { 
+      id: 'c3', 
+      title: 'Conclusion', 
+      startTime: Math.floor(duration * 2 / 3), 
+      endTime: duration, 
+      bullets: ['Summary', 'Next steps'], 
+      keyQuote: "Wrapping up the discussion." 
+    },
+  ],
+  checkpoints: [
+    { id: 'cp1', type: 'task', text: 'Follow up on discussion points', timestamp: Math.floor(duration / 4) },
+    { id: 'cp2', type: 'decision', text: 'Key decision made during recording', timestamp: Math.floor(duration / 2) },
+    { id: 'cp3', type: 'question', text: 'Question raised for future consideration', timestamp: Math.floor(duration * 3 / 4) },
+  ],
+  summary: {
+    executive: {
+      keyPoints: ['Main topic discussed', 'Key insights shared', 'Important conclusions reached'],
+      decisions: ['Primary decision made', 'Secondary action agreed'],
+      nextSteps: ['Follow up on key points', 'Schedule next discussion', 'Share recording with team'],
+    },
+    student: {
+      chapters: ['Overview of the recording content and key themes'],
+      glossary: [
+        { term: 'Key Term', definition: 'Important concept discussed in this recording' },
+      ],
+      quiz: [
+        { question: 'What was the main topic?', answer: 'The key discussion points' },
+      ],
+    },
+  },
+  quoteCards: [
+    { id: 'q1', quote: "This captures the essence of our discussion perfectly.", speaker: 'Speaker 1', timestamp: Math.floor(duration / 4), style: 'minimal' },
+    { id: 'q2', quote: "An important insight that emerged from the conversation.", speaker: 'Speaker 1', timestamp: Math.floor(duration / 2), style: 'corporate' },
+    { id: 'q3', quote: "The key takeaway everyone should remember.", speaker: 'Speaker 1', timestamp: Math.floor(duration * 3 / 4), style: 'bold' },
+  ],
+  highlightReel: {
+    id: 'hr1',
+    duration: 60,
+    moments: [
+      { startTime: 0, endTime: 15, caption: 'Opening highlights' },
+      { startTime: Math.floor(duration / 3), endTime: Math.floor(duration / 3) + 15, caption: 'Key moment' },
+      { startTime: Math.floor(duration * 2 / 3), endTime: Math.floor(duration * 2 / 3) + 15, caption: 'Important insight' },
+      { startTime: duration - 20, endTime: duration, caption: 'Closing remarks' },
+    ],
+  },
+});
+
+// Two example recordings prepacked with full features
 const demoRecordings: Recording[] = [
   {
     id: '1',
@@ -109,31 +192,44 @@ const demoRecordings: Recording[] = [
       { id: 't1', text: "Let's explore new feature ideas for Q2.", startTime: 0, endTime: 4, speaker: 'Product Lead' },
       { id: 't2', text: "I've been hearing a lot of requests for AI-powered summaries.", startTime: 4, endTime: 10, speaker: 'Designer' },
       { id: 't3', text: "That aligns with our roadmap. What about the implementation timeline?", startTime: 10, endTime: 16, speaker: 'Product Lead' },
+      { id: 't4', text: "We could prototype it in two weeks and test with beta users.", startTime: 16, endTime: 22, speaker: 'Engineer' },
+      { id: 't5', text: "Perfect. Let's also consider mobile-first design for this feature.", startTime: 22, endTime: 28, speaker: 'Designer' },
     ],
     chapters: [
       { id: 'c1', title: 'Feature Ideation', startTime: 0, endTime: 600, bullets: ['AI summaries', 'Export improvements', 'Mobile redesign'], keyQuote: 'AI-powered features are the future.' },
       { id: 'c2', title: 'Prioritization', startTime: 600, endTime: 1200, bullets: ['Impact scoring', 'Resource allocation'], keyQuote: 'Focus on high-impact, low-effort wins.' },
+      { id: 'c3', title: 'Timeline Planning', startTime: 1200, endTime: 1847, bullets: ['Sprint planning', 'Milestone setting'], keyQuote: 'Two-week prototype cycle.' },
     ],
     checkpoints: [
       { id: 'cp1', type: 'decision', text: 'Prioritize AI summaries for Q2', timestamp: 300 },
       { id: 'cp2', type: 'task', text: 'Create design mockups by next week', timestamp: 800 },
+      { id: 'cp3', type: 'task', text: 'Engineering spike on AI integration', timestamp: 1100 },
+      { id: 'cp4', type: 'question', text: 'Which AI provider to use?', timestamp: 1400 },
     ],
     summary: {
       executive: {
-        keyPoints: ['AI summaries top priority', 'Mobile redesign scheduled for Q3'],
-        decisions: ['Focus Q2 on AI features'],
-        nextSteps: ['Design mockups due next week', 'Engineering spike on AI integration'],
+        keyPoints: ['AI summaries top priority', 'Mobile redesign scheduled for Q3', 'Two-week prototype cycle agreed'],
+        decisions: ['Focus Q2 on AI features', 'Mobile-first design approach'],
+        nextSteps: ['Design mockups due next week', 'Engineering spike on AI integration', 'Beta user recruitment'],
       },
       student: {
         chapters: ['Product brainstorming session for Q2 planning'],
-        glossary: [{ term: 'Roadmap', definition: 'Strategic plan for product development' }],
-        quiz: [{ question: 'What is the Q2 priority?', answer: 'AI-powered summaries' }],
+        glossary: [
+          { term: 'Roadmap', definition: 'Strategic plan for product development' },
+          { term: 'Sprint', definition: 'Time-boxed development cycle, usually 2 weeks' },
+        ],
+        quiz: [
+          { question: 'What is the Q2 priority?', answer: 'AI-powered summaries' },
+          { question: 'How long is the prototype cycle?', answer: 'Two weeks' },
+        ],
       },
     },
     quoteCards: [
       { id: 'q1', quote: "AI-powered features will set us apart from the competition.", speaker: 'Product Lead', timestamp: 250, style: 'bold' },
       { id: 'q2', quote: "Focus on high-impact, low-effort wins first.", speaker: 'Designer', timestamp: 620, style: 'minimal' },
       { id: 'q3', quote: "Mobile redesign is critical for user retention.", speaker: 'Product Lead', timestamp: 900, style: 'corporate' },
+      { id: 'q4', quote: "We could prototype it in two weeks and test with beta users.", speaker: 'Engineer', timestamp: 18, style: 'ocean' },
+      { id: 'q5', quote: "Let's make mobile-first our design philosophy.", speaker: 'Designer', timestamp: 1300, style: 'sunset' },
     ],
     highlightReel: {
       id: 'hr2',
@@ -145,45 +241,6 @@ const demoRecordings: Recording[] = [
         { startTime: 1100, endTime: 1120, caption: 'Q2 roadmap finalized' },
       ],
     },
-  },
-  {
-    id: '3',
-    title: 'Client Call - Acme Corp',
-    duration: 2156,
-    createdAt: new Date(Date.now() - 50 * 60 * 60 * 1000),
-    isPinned: false,
-    isTranscribed: true,
-    transcript: [
-      { id: 't1', text: "Thanks for joining, let's review the contract terms.", startTime: 0, endTime: 5 },
-      { id: 't2', text: "We're excited about this partnership.", startTime: 5, endTime: 9 },
-    ],
-    chapters: [
-      { id: 'c1', title: 'Contract Review', startTime: 0, endTime: 900, bullets: ['Terms discussion', 'Pricing agreement'], keyQuote: 'Partnership finalized.' },
-    ],
-    checkpoints: [
-      { id: 'cp1', type: 'decision', text: 'Agreed on 12-month contract', timestamp: 600 },
-      { id: 'cp2', type: 'task', text: 'Send final contract by Monday', timestamp: 1800 },
-    ],
-  },
-  {
-    id: '4',
-    title: 'Interview - Senior Developer',
-    duration: 2890,
-    createdAt: new Date(Date.now() - 72 * 60 * 60 * 1000),
-    isPinned: false,
-    isTranscribed: true,
-    transcript: [
-      { id: 't1', text: "Tell me about your experience with React.", startTime: 0, endTime: 4 },
-      { id: 't2', text: "I've been working with React for 5 years, starting with class components.", startTime: 4, endTime: 10 },
-    ],
-  },
-  {
-    id: '5',
-    title: 'Personal Voice Note',
-    duration: 87,
-    createdAt: new Date(Date.now() - 168 * 60 * 60 * 1000),
-    isPinned: false,
-    isTranscribed: false,
   },
 ];
 

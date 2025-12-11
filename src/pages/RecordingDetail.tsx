@@ -170,7 +170,7 @@ export default function RecordingDetail() {
           </TabsContent>
 
           <TabsContent value="translate" className="mt-0 animate-fade-in">
-            <TranslateView transcript={recording.transcript} />
+            <TranslateView transcript={recording.transcript} title={recording.title} />
           </TabsContent>
 
           <TabsContent value="quotes" className="mt-0 animate-fade-in">
