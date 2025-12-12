@@ -1,11 +1,17 @@
 import { useState } from 'react';
 import { motion } from 'framer-motion';
-import { Search, FileText, Share2, Download } from 'lucide-react';
+import { Search, FileText, Share2, Download, FileCode } from 'lucide-react';
 import { Input } from '@/components/ui/input';
 import { Button } from '@/components/ui/button';
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuTrigger,
+} from '@/components/ui/dropdown-menu';
 import { TranscriptSegment } from '@/types/recording';
 import { formatTime } from '@/lib/formatters';
-import { shareText, generateTranscriptText, downloadTextFile } from '@/lib/shareUtils';
+import { shareText, generateTranscriptText, downloadTextFile, downloadHtmlFile, generateTranscriptHtml } from '@/lib/shareUtils';
 import { toast } from 'sonner';
 
 interface TranscriptViewProps {
@@ -24,11 +30,18 @@ export function TranscriptView({ transcript, onTimeClick, title = 'Recording' }:
     if (shared) toast.success('Transcript shared!');
   };
 
-  const handleSave = () => {
+  const handleSaveText = () => {
     if (!transcript) return;
     const text = generateTranscriptText(transcript);
     downloadTextFile(`${title.replace(/\s+/g, '_')}_transcript.txt`, text);
-    toast.success('Transcript saved to device');
+    toast.success('Transcript saved as text');
+  };
+
+  const handleSaveHtml = () => {
+    if (!transcript) return;
+    const html = generateTranscriptHtml(transcript, title);
+    downloadHtmlFile(`${title.replace(/\s+/g, '_')}_transcript.html`, html);
+    toast.success('Transcript saved as HTML');
   };
 
   if (!transcript || transcript.length === 0) {
@@ -96,10 +109,24 @@ export function TranscriptView({ transcript, onTimeClick, title = 'Recording' }:
           <Share2 className="w-4 h-4 mr-2" />
           Share
         </Button>
-        <Button variant="outline" className="flex-1" onClick={handleSave}>
-          <Download className="w-4 h-4 mr-2" />
-          Save
-        </Button>
+        <DropdownMenu>
+          <DropdownMenuTrigger asChild>
+            <Button variant="outline" className="flex-1">
+              <Download className="w-4 h-4 mr-2" />
+              Save
+            </Button>
+          </DropdownMenuTrigger>
+          <DropdownMenuContent align="end">
+            <DropdownMenuItem onClick={handleSaveText}>
+              <FileText className="w-4 h-4 mr-2" />
+              Save as Text (.txt)
+            </DropdownMenuItem>
+            <DropdownMenuItem onClick={handleSaveHtml}>
+              <FileCode className="w-4 h-4 mr-2" />
+              Save as HTML
+            </DropdownMenuItem>
+          </DropdownMenuContent>
+        </DropdownMenu>
       </div>
     </div>
   );

@@ -12,7 +12,6 @@ import {
 } from '@/components/ui/dropdown-menu';
 import { AudioPlayer } from '@/components/session/AudioPlayer';
 import { TranscriptView } from '@/components/session/TranscriptView';
-import { ChaptersView } from '@/components/session/ChaptersView';
 import { CheckpointsView } from '@/components/session/CheckpointsView';
 import { SummaryView } from '@/components/session/SummaryView';
 import { TranslateView } from '@/components/session/TranslateView';
@@ -59,7 +58,6 @@ export default function RecordingDetail() {
   const tabs = [
     { value: 'audio', label: 'Audio' },
     { value: 'transcript', label: 'Transcript' },
-    { value: 'chapters', label: 'Chapters' },
     { value: 'checkpoints', label: 'Checkpoints' },
     { value: 'summary', label: 'Summary' },
     { value: 'translate', label: 'Translate' },
@@ -150,15 +148,15 @@ export default function RecordingDetail() {
           </ScrollArea>
 
           <TabsContent value="audio" className="mt-0 animate-fade-in">
-            <AudioPlayer duration={recording.duration} title={recording.title} />
+            <AudioPlayer 
+              duration={recording.duration} 
+              title={recording.title} 
+              chapters={recording.chapters}
+            />
           </TabsContent>
 
           <TabsContent value="transcript" className="mt-0 animate-fade-in">
             <TranscriptView transcript={recording.transcript} title={recording.title} />
-          </TabsContent>
-
-          <TabsContent value="chapters" className="mt-0 animate-fade-in">
-            <ChaptersView chapters={recording.chapters} />
           </TabsContent>
 
           <TabsContent value="checkpoints" className="mt-0 animate-fade-in">

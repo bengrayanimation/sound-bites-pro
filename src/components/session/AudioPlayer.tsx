@@ -1,20 +1,22 @@
 import { useState } from 'react';
 import { motion } from 'framer-motion';
-import { Play, Pause, SkipBack, SkipForward, Volume2, Share2, Download } from 'lucide-react';
+import { Play, Pause, SkipBack, SkipForward, Volume2, Share2, Download, BookOpen, Quote } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Slider } from '@/components/ui/slider';
 import { formatTime } from '@/lib/formatters';
 import { shareText, downloadTextFile } from '@/lib/shareUtils';
 import { toast } from 'sonner';
+import { Chapter } from '@/types/recording';
 
 interface AudioPlayerProps {
   duration: number;
   currentTime?: number;
   onSeek?: (time: number) => void;
   title?: string;
+  chapters?: Chapter[];
 }
 
-export function AudioPlayer({ duration, currentTime = 0, onSeek, title = 'Recording' }: AudioPlayerProps) {
+export function AudioPlayer({ duration, currentTime = 0, onSeek, title = 'Recording', chapters }: AudioPlayerProps) {
   const [isPlaying, setIsPlaying] = useState(false);
   const [playbackSpeed, setPlaybackSpeed] = useState(1);
   const [position, setPosition] = useState(currentTime);
@@ -32,12 +34,22 @@ export function AudioPlayer({ duration, currentTime = 0, onSeek, title = 'Record
     onSeek?.(value[0]);
   };
 
+  const jumpToTime = (time: number) => {
+    setPosition(time);
+    onSeek?.(time);
+    toast.success(`Jumped to ${formatTime(time)}`);
+  };
+
   const skipBackward = () => {
-    setPosition(Math.max(0, position - 15));
+    const newPos = Math.max(0, position - 15);
+    setPosition(newPos);
+    onSeek?.(newPos);
   };
 
   const skipForward = () => {
-    setPosition(Math.min(duration, position + 15));
+    const newPos = Math.min(duration, position + 15);
+    setPosition(newPos);
+    onSeek?.(newPos);
   };
 
   const handleShare = async () => {
@@ -47,8 +59,6 @@ export function AudioPlayer({ duration, currentTime = 0, onSeek, title = 'Record
   };
 
   const handleSave = () => {
-    // In a real app, this would save the actual audio file
-    // For demo, we just show a success message
     toast.success('Audio would be saved to device (demo mode)');
   };
 
@@ -175,6 +185,60 @@ export function AudioPlayer({ duration, currentTime = 0, onSeek, title = 'Record
           Save Audio
         </Button>
       </div>
+
+      {/* Chapters Section */}
+      {chapters && chapters.length > 0 && (
+        <div className="space-y-4 pt-6 border-t border-border">
+          <div className="flex items-center gap-2">
+            <BookOpen className="w-5 h-5 text-primary" />
+            <h3 className="font-semibold text-foreground">Chapters</h3>
+          </div>
+          
+          <div className="space-y-3">
+            {chapters.map((chapter, index) => (
+              <motion.div
+                key={chapter.id}
+                initial={{ opacity: 0, y: 10 }}
+                animate={{ opacity: 1, y: 0 }}
+                transition={{ delay: index * 0.05 }}
+                className="bg-card border border-border rounded-xl p-4 space-y-3"
+              >
+                <button
+                  onClick={() => jumpToTime(chapter.startTime)}
+                  className="flex items-start gap-3 w-full text-left group"
+                >
+                  <span className="text-xs font-mono text-primary font-medium mt-0.5 min-w-[48px] bg-primary/10 px-2 py-1 rounded">
+                    {formatTime(chapter.startTime)}
+                  </span>
+                  <div className="flex-1">
+                    <h4 className="font-semibold text-foreground group-hover:text-primary transition-colors">
+                      {chapter.title}
+                    </h4>
+                  </div>
+                </button>
+
+                {chapter.bullets.length > 0 && (
+                  <ul className="space-y-1.5 pl-[60px]">
+                    {chapter.bullets.map((bullet, i) => (
+                      <li key={i} className="text-sm text-muted-foreground flex gap-2">
+                        <span className="text-primary">•</span>
+                        {bullet}
+                      </li>
+                    ))}
+                  </ul>
+                )}
+
+                {chapter.keyQuote && (
+                  <div className="ml-[60px] flex gap-2 p-3 bg-primary/5 rounded-lg">
+                    <Quote className="w-4 h-4 text-primary flex-shrink-0 mt-0.5" />
+                    <p className="text-sm text-foreground italic">"{chapter.keyQuote}"</p>
+                  </div>
+                )}
+              </motion.div>
+            ))}
+          </div>
+        </div>
+      )}
     </div>
   );
 }
