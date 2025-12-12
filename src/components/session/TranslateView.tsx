@@ -1,6 +1,6 @@
 import { useState } from 'react';
 import { motion } from 'framer-motion';
-import { Globe, ChevronDown, Download, Share2 } from 'lucide-react';
+import { Globe, ChevronDown, Download, Share2, Loader2 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import {
   DropdownMenu,
@@ -9,9 +9,10 @@ import {
   DropdownMenuTrigger,
 } from '@/components/ui/dropdown-menu';
 import { TranscriptSegment } from '@/types/recording';
-import { downloadTextFile, shareText } from '@/lib/shareUtils';
+import { downloadTextFile, shareText, downloadHtmlFile, generateTranslatedHtml } from '@/lib/shareUtils';
 import { formatTime } from '@/lib/formatters';
 import { toast } from 'sonner';
+import { supabase } from '@/integrations/supabase/client';
 
 interface TranslateViewProps {
   transcript?: TranscriptSegment[];
@@ -33,22 +34,62 @@ const languages = [
 
 export function TranslateView({ transcript, title = 'Recording' }: TranslateViewProps) {
   const [selectedLanguage, setSelectedLanguage] = useState(languages[0]);
-  const [isTranslated, setIsTranslated] = useState(false);
+  const [isTranslating, setIsTranslating] = useState(false);
+  const [translatedTranscript, setTranslatedTranscript] = useState<TranscriptSegment[] | null>(null);
+
+  const translateTranscript = async () => {
+    if (!transcript || transcript.length === 0) return;
+    
+    setIsTranslating(true);
+    toast.loading(`Translating to ${selectedLanguage.name}...`, { id: 'translate' });
+    
+    try {
+      const { data, error } = await supabase.functions.invoke('translate', {
+        body: {
+          transcript,
+          targetLanguage: selectedLanguage.name,
+          title
+        }
+      });
+
+      if (error) throw error;
+
+      if (data?.translatedTranscript) {
+        setTranslatedTranscript(data.translatedTranscript);
+        toast.success(`Translated to ${selectedLanguage.name}!`, { id: 'translate' });
+      } else {
+        throw new Error('No translation returned');
+      }
+    } catch (error) {
+      console.error('Translation error:', error);
+      toast.error('Translation failed. Please try again.', { id: 'translate' });
+    } finally {
+      setIsTranslating(false);
+    }
+  };
 
   const generateTranslatedText = () => {
-    if (!transcript) return '';
+    const source = translatedTranscript || transcript;
+    if (!source) return '';
     let text = `📋 ${title} - Translation (${selectedLanguage.name})\n\n`;
-    text += `Note: This is a demo translation preview.\n\n`;
-    transcript.forEach((seg) => {
+    source.forEach((seg) => {
       text += `[${formatTime(seg.startTime)}] ${seg.speaker ? `${seg.speaker}: ` : ''}${seg.text}\n`;
     });
     return text;
   };
 
-  const handleDownload = () => {
+  const handleDownloadTxt = () => {
     const text = generateTranslatedText();
     downloadTextFile(`${title.replace(/\s+/g, '_')}_${selectedLanguage.code}.txt`, text);
-    toast.success(`Translation saved (${selectedLanguage.name})`);
+    toast.success(`Translation saved as TXT (${selectedLanguage.name})`);
+  };
+
+  const handleDownloadHtml = () => {
+    const source = translatedTranscript || transcript;
+    if (!source) return;
+    const html = generateTranslatedHtml(source, title, selectedLanguage.name);
+    downloadHtmlFile(`${title.replace(/\s+/g, '_')}_${selectedLanguage.code}.html`, html);
+    toast.success(`Translation saved as HTML (${selectedLanguage.name})`);
   };
 
   const handleShare = async () => {
@@ -71,6 +112,8 @@ export function TranslateView({ transcript, title = 'Recording' }: TranslateView
     );
   }
 
+  const displayTranscript = translatedTranscript || transcript;
+
   return (
     <div className="space-y-6">
       {/* Language selector */}
@@ -90,7 +133,7 @@ export function TranslateView({ transcript, title = 'Recording' }: TranslateView
                 key={lang.code}
                 onClick={() => {
                   setSelectedLanguage(lang);
-                  setIsTranslated(false);
+                  setTranslatedTranscript(null);
                 }}
               >
                 {lang.name}
@@ -104,40 +147,55 @@ export function TranslateView({ transcript, title = 'Recording' }: TranslateView
       <div className="p-4 bg-muted/50 rounded-xl space-y-4">
         <div className="flex items-center gap-2 text-sm text-muted-foreground">
           <Globe className="w-4 h-4" />
-          Translation to {selectedLanguage.name}
+          {translatedTranscript ? `Translated to ${selectedLanguage.name}` : `Preview (${selectedLanguage.name})`}
         </div>
         
-        <div className="space-y-3">
-          {transcript.slice(0, 5).map((segment, index) => (
+        <div className="space-y-3 max-h-64 overflow-y-auto">
+          {displayTranscript.slice(0, translatedTranscript ? undefined : 5).map((segment, index) => (
             <motion.div
               key={segment.id}
               initial={{ opacity: 0 }}
               animate={{ opacity: 1 }}
-              transition={{ delay: index * 0.1 }}
+              transition={{ delay: index * 0.05 }}
               className="text-sm text-foreground"
             >
               <span className="text-xs text-primary font-mono mr-2">
-                {Math.floor(segment.startTime / 60)}:{(segment.startTime % 60).toString().padStart(2, '0')}
+                {formatTime(segment.startTime)}
               </span>
               {segment.speaker && <span className="font-medium">{segment.speaker}: </span>}
               {segment.text}
             </motion.div>
           ))}
-          {transcript.length > 5 && (
+          {!translatedTranscript && transcript.length > 5 && (
             <p className="text-sm text-muted-foreground">
               + {transcript.length - 5} more segments...
             </p>
           )}
         </div>
 
-        <p className="text-xs text-muted-foreground italic">
-          Pro tip: Translation preserves original timestamps for easy reference
-        </p>
+        {!translatedTranscript && (
+          <p className="text-xs text-muted-foreground italic">
+            Pro tip: Translation preserves original timestamps for easy reference
+          </p>
+        )}
       </div>
 
-      <Button className="w-full" onClick={() => setIsTranslated(true)}>
-        <Globe className="w-4 h-4 mr-2" />
-        Translate Full Transcript
+      <Button 
+        className="w-full" 
+        onClick={translateTranscript}
+        disabled={isTranslating}
+      >
+        {isTranslating ? (
+          <>
+            <Loader2 className="w-4 h-4 mr-2 animate-spin" />
+            Translating...
+          </>
+        ) : (
+          <>
+            <Globe className="w-4 h-4 mr-2" />
+            {translatedTranscript ? 'Translate Again' : 'Translate Full Transcript'}
+          </>
+        )}
       </Button>
 
       {/* Download/Share actions */}
@@ -146,10 +204,23 @@ export function TranslateView({ transcript, title = 'Recording' }: TranslateView
           <Share2 className="w-4 h-4 mr-2" />
           Share
         </Button>
-        <Button variant="outline" onClick={handleDownload}>
-          <Download className="w-4 h-4 mr-2" />
-          Download
-        </Button>
+        <DropdownMenu>
+          <DropdownMenuTrigger asChild>
+            <Button variant="outline" className="gap-2">
+              <Download className="w-4 h-4" />
+              Download
+              <ChevronDown className="w-4 h-4 opacity-50" />
+            </Button>
+          </DropdownMenuTrigger>
+          <DropdownMenuContent align="end">
+            <DropdownMenuItem onClick={handleDownloadTxt}>
+              Download as TXT
+            </DropdownMenuItem>
+            <DropdownMenuItem onClick={handleDownloadHtml}>
+              Download as HTML
+            </DropdownMenuItem>
+          </DropdownMenuContent>
+        </DropdownMenu>
       </div>
     </div>
   );

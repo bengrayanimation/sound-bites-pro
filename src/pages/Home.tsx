@@ -1,65 +1,147 @@
-import { useState, useCallback } from 'react';
+import { useState, useCallback, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { motion, AnimatePresence } from 'framer-motion';
-import { Settings, Library } from 'lucide-react';
+import { Settings, Library, Loader2 } from 'lucide-react';
 import { RecordButton } from '@/components/RecordButton';
 import { Waveform } from '@/components/Waveform';
 import { Timer } from '@/components/Timer';
 import { PinnedRecordings } from '@/components/PinnedRecordings';
 import { Paywall } from '@/components/Paywall';
 import { Button } from '@/components/ui/button';
-import { useRecordingStore } from '@/stores/recordingStore';
+import { useRecordingStore, createRecordingTemplate } from '@/stores/recordingStore';
+import { useAudioRecorder } from '@/hooks/useAudioRecorder';
+import { useTranscription } from '@/hooks/useTranscription';
 import { Recording } from '@/types/recording';
-import { toast } from '@/hooks/use-toast';
+import { toast } from 'sonner';
 
 export default function Home() {
   const navigate = useNavigate();
-  const [isRecording, setIsRecording] = useState(false);
-  const [recordingDuration, setRecordingDuration] = useState(0);
   const [showPaywall, setShowPaywall] = useState(false);
+  const [isProcessing, setIsProcessing] = useState(false);
   
   const { 
     recordings, 
     freeRecordingsLeft, 
     isPro, 
     addRecording, 
+    updateRecording,
     decrementFreeRecordings,
     upgradeToPro 
   } = useRecordingStore();
 
+  const {
+    isRecording,
+    audioBase64,
+    duration,
+    error: recorderError,
+    startRecording,
+    stopRecording,
+    reset: resetRecorder
+  } = useAudioRecorder();
+
+  const {
+    processRecording,
+    isProcessing: isTranscribing,
+    progress,
+    error: transcriptionError
+  } = useTranscription();
+
   const pinnedRecordings = recordings.filter((r) => r.isPinned).slice(0, 3);
 
-  const handleRecordToggle = useCallback(() => {
-    if (isRecording) {
-      // Stop recording
-      setIsRecording(false);
+  // Handle recording errors
+  useEffect(() => {
+    if (recorderError) {
+      toast.error(recorderError);
+    }
+  }, [recorderError]);
+
+  useEffect(() => {
+    if (transcriptionError) {
+      toast.error(transcriptionError);
+    }
+  }, [transcriptionError]);
+
+  // Process audio when recording stops
+  useEffect(() => {
+    if (!isRecording && audioBase64 && duration > 0 && !isProcessing) {
+      processAudio();
+    }
+  }, [isRecording, audioBase64]);
+
+  const processAudio = async () => {
+    if (!audioBase64 || duration === 0) return;
+    
+    setIsProcessing(true);
+    
+    const newRecording: Recording = {
+      id: Date.now().toString(),
+      title: `Recording ${new Date().toLocaleDateString('en-GB', { 
+        day: 'numeric', 
+        month: 'short',
+        hour: '2-digit',
+        minute: '2-digit'
+      })}`,
+      duration,
+      createdAt: new Date(),
+      isPinned: false,
+      isTranscribed: false,
+      audioUrl: audioBase64,
+    };
+    
+    addRecording(newRecording);
+    
+    toast.loading('Transcribing your recording...', { id: 'transcription' });
+    
+    try {
+      const result = await processRecording(audioBase64, duration, newRecording.title);
       
-      // Save recording
-      const newRecording: Recording = {
-        id: Date.now().toString(),
-        title: `Recording ${new Date().toLocaleDateString('en-GB', { 
-          day: 'numeric', 
-          month: 'short',
-          hour: '2-digit',
-          minute: '2-digit'
-        })}`,
-        duration: recordingDuration,
-        createdAt: new Date(),
-        isPinned: false,
-        isTranscribed: false,
-      };
+      if (result) {
+        updateRecording(newRecording.id, {
+          isTranscribed: true,
+          transcript: result.transcript,
+          chapters: result.chapters,
+          checkpoints: result.checkpoints,
+          summary: result.summary,
+          quoteCards: result.quoteCards,
+          highlightReel: result.highlightReel,
+        });
+        
+        toast.success('Recording transcribed and analyzed!', { id: 'transcription' });
+      } else {
+        // Use template content as fallback
+        const template = createRecordingTemplate(
+          newRecording.id,
+          newRecording.title,
+          duration,
+          newRecording.createdAt
+        );
+        updateRecording(newRecording.id, {
+          isTranscribed: true,
+          transcript: template.transcript,
+          chapters: template.chapters,
+          checkpoints: template.checkpoints,
+          summary: template.summary,
+          quoteCards: template.quoteCards,
+          highlightReel: template.highlightReel,
+        });
+        
+        toast.success('Recording saved with demo content', { id: 'transcription' });
+      }
       
-      addRecording(newRecording);
-      
-      toast({
-        title: 'Recording saved',
-        description: `${newRecording.title} has been saved to your library.`,
-      });
-      
-      // Navigate to the recording
       navigate(`/recording/${newRecording.id}`);
+    } catch (error) {
+      console.error('Processing error:', error);
+      toast.error('Failed to process recording', { id: 'transcription' });
+    } finally {
+      setIsProcessing(false);
+      resetRecorder();
+    }
+  };
+
+  const handleRecordToggle = useCallback(async () => {
+    if (isRecording) {
+      stopRecording();
     } else {
-      // Start recording
       if (!isPro && freeRecordingsLeft <= 0) {
         setShowPaywall(true);
         return;
@@ -69,10 +151,9 @@ export default function Home() {
         decrementFreeRecordings();
       }
       
-      setIsRecording(true);
-      setRecordingDuration(0);
+      await startRecording();
     }
-  }, [isRecording, recordingDuration, isPro, freeRecordingsLeft, addRecording, decrementFreeRecordings, navigate]);
+  }, [isRecording, isPro, freeRecordingsLeft, startRecording, stopRecording, decrementFreeRecordings]);
 
   const handleSelectRecording = (recording: Recording) => {
     navigate(`/recording/${recording.id}`);
@@ -81,17 +162,14 @@ export default function Home() {
   const handleUpgrade = () => {
     upgradeToPro();
     setShowPaywall(false);
-    toast({
-      title: 'Welcome to Pro!',
-      description: 'You now have unlimited access to all features.',
-    });
+    toast.success('Welcome to Pro! You now have unlimited access to all features.');
   };
 
   return (
     <div className="min-h-screen bg-background flex flex-col">
       {/* Header */}
       <header className="flex items-center justify-between p-4">
-        <div className="w-11" /> {/* Spacer */}
+        <div className="w-11" />
         
         <motion.h1 
           initial={{ opacity: 0, y: -10 }}
@@ -125,8 +203,30 @@ export default function Home() {
           </motion.div>
         )}
 
+        {/* Processing indicator */}
+        {isProcessing && (
+          <motion.div
+            initial={{ opacity: 0 }}
+            animate={{ opacity: 1 }}
+            className="mb-8 flex flex-col items-center gap-3"
+          >
+            <Loader2 className="w-8 h-8 text-primary animate-spin" />
+            <span className="text-sm text-muted-foreground">
+              {isTranscribing ? 'Transcribing...' : 'Processing recording...'}
+            </span>
+            <div className="w-48 h-2 bg-muted rounded-full overflow-hidden">
+              <motion.div
+                className="h-full bg-primary"
+                initial={{ width: 0 }}
+                animate={{ width: `${progress}%` }}
+                transition={{ duration: 0.3 }}
+              />
+            </div>
+          </motion.div>
+        )}
+
         {/* Pinned recordings */}
-        {!isRecording && (
+        {!isRecording && !isProcessing && (
           <motion.div
             initial={{ opacity: 0, y: 20 }}
             animate={{ opacity: 1, y: 0 }}
@@ -149,13 +249,15 @@ export default function Home() {
               className="mb-8 flex flex-col items-center gap-6"
             >
               <Waveform isAnimating={isRecording} barCount={12} />
-              <Timer isRunning={isRecording} onTimeUpdate={setRecordingDuration} />
+              <Timer isRunning={isRecording} onTimeUpdate={() => {}} initialTime={duration} />
             </motion.div>
           )}
         </AnimatePresence>
 
         {/* Record button */}
-        <RecordButton isRecording={isRecording} onToggle={handleRecordToggle} />
+        {!isProcessing && (
+          <RecordButton isRecording={isRecording} onToggle={handleRecordToggle} />
+        )}
       </main>
 
       {/* Bottom navigation */}

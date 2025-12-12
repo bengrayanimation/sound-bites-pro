@@ -1,12 +1,14 @@
 import { useState, useRef } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
-import { Quote, Share2, Download, ChevronLeft, ChevronRight, DownloadCloud, ImagePlus, X } from 'lucide-react';
+import { Quote, Share2, Download, ChevronLeft, ChevronRight, DownloadCloud, ImagePlus, X, Pencil, Check } from 'lucide-react';
 import { Button } from '@/components/ui/button';
+import { Textarea } from '@/components/ui/textarea';
+import { Input } from '@/components/ui/input';
 import { QuoteCard } from '@/types/recording';
 import { formatTime } from '@/lib/formatters';
 import { 
   shareQuoteAsImage, 
-  downloadQuoteAsImage, 
+  downloadQuoteAsJpg, 
   quoteCardStyles,
   generateQuoteCardImage,
   downloadFile
@@ -16,14 +18,18 @@ import { toast } from 'sonner';
 interface QuoteCardsViewProps {
   quoteCards?: QuoteCard[];
   title?: string;
+  onUpdateQuote?: (index: number, quote: QuoteCard) => void;
 }
 
 const styleKeys = Object.keys(quoteCardStyles);
 
-export function QuoteCardsView({ quoteCards, title = 'Recording' }: QuoteCardsViewProps) {
+export function QuoteCardsView({ quoteCards, title = 'Recording', onUpdateQuote }: QuoteCardsViewProps) {
   const [currentIndex, setCurrentIndex] = useState(0);
   const [currentStyleIndex, setCurrentStyleIndex] = useState(0);
   const [backgroundImage, setBackgroundImage] = useState<string | null>(null);
+  const [isEditing, setIsEditing] = useState(false);
+  const [editedQuote, setEditedQuote] = useState('');
+  const [editedSpeaker, setEditedSpeaker] = useState('');
   const fileInputRef = useRef<HTMLInputElement>(null);
 
   const handleShare = async () => {
@@ -40,10 +46,10 @@ export function QuoteCardsView({ quoteCards, title = 'Recording' }: QuoteCardsVi
     if (!quoteCards || quoteCards.length === 0) return;
     const quote = quoteCards[currentIndex];
     const styleKey = styleKeys[currentStyleIndex];
-    toast.loading('Generating image...');
-    await downloadQuoteAsImage(quote, styleKey, `${title.replace(/\s+/g, '_')}_quote_${currentIndex + 1}.png`, backgroundImage || undefined);
+    toast.loading('Generating JPG...');
+    await downloadQuoteAsJpg(quote, styleKey, `${title.replace(/\s+/g, '_')}_quote_${currentIndex + 1}.jpg`, backgroundImage || undefined);
     toast.dismiss();
-    toast.success('Quote card saved as image');
+    toast.success('Quote card saved as JPG');
   };
 
   const handleSaveAll = async () => {
@@ -52,13 +58,13 @@ export function QuoteCardsView({ quoteCards, title = 'Recording' }: QuoteCardsVi
     const styleKey = styleKeys[currentStyleIndex];
     
     for (let i = 0; i < quoteCards.length; i++) {
-      const blob = await generateQuoteCardImage(quoteCards[i], styleKey, backgroundImage || undefined);
-      downloadFile(`${title.replace(/\s+/g, '_')}_quote_${i + 1}.png`, blob);
+      const blob = await generateQuoteCardImage(quoteCards[i], styleKey, backgroundImage || undefined, 'jpg');
+      downloadFile(`${title.replace(/\s+/g, '_')}_quote_${i + 1}.jpg`, blob);
       await new Promise(resolve => setTimeout(resolve, 300));
     }
     
     toast.dismiss();
-    toast.success(`Saved ${quoteCards.length} quote cards`);
+    toast.success(`Saved ${quoteCards.length} quote cards as JPGs`);
   };
 
   const handleImageUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
@@ -77,6 +83,32 @@ export function QuoteCardsView({ quoteCards, title = 'Recording' }: QuoteCardsVi
     if (fileInputRef.current) {
       fileInputRef.current.value = '';
     }
+  };
+
+  const startEditing = () => {
+    if (!quoteCards || quoteCards.length === 0) return;
+    const quote = quoteCards[currentIndex];
+    setEditedQuote(quote.quote);
+    setEditedSpeaker(quote.speaker);
+    setIsEditing(true);
+  };
+
+  const saveEdit = () => {
+    if (!quoteCards || !onUpdateQuote) return;
+    const quote = quoteCards[currentIndex];
+    onUpdateQuote(currentIndex, {
+      ...quote,
+      quote: editedQuote,
+      speaker: editedSpeaker,
+    });
+    setIsEditing(false);
+    toast.success('Quote card updated');
+  };
+
+  const cancelEdit = () => {
+    setIsEditing(false);
+    setEditedQuote('');
+    setEditedSpeaker('');
   };
 
   if (!quoteCards || quoteCards.length === 0) {
@@ -98,13 +130,14 @@ export function QuoteCardsView({ quoteCards, title = 'Recording' }: QuoteCardsVi
 
   const nextCard = () => {
     setCurrentIndex((i) => (i + 1) % quoteCards.length);
+    setIsEditing(false);
   };
 
   const prevCard = () => {
     setCurrentIndex((i) => (i - 1 + quoteCards.length) % quoteCards.length);
+    setIsEditing(false);
   };
 
-  // Dynamic styles based on current style
   const getCardStyles = () => {
     if (backgroundImage) {
       return 'border-transparent text-white';
@@ -170,7 +203,6 @@ export function QuoteCardsView({ quoteCards, title = 'Recording' }: QuoteCardsVi
           />
         ))}
         
-        {/* Add background image button */}
         <input
           ref={fileInputRef}
           type="file"
@@ -206,7 +238,7 @@ export function QuoteCardsView({ quoteCards, title = 'Recording' }: QuoteCardsVi
       <div className="relative">
         <AnimatePresence mode="wait">
           <motion.div
-            key={`${currentCard.id}-${currentStyleKey}-${backgroundImage}`}
+            key={`${currentCard.id}-${currentStyleKey}-${backgroundImage}-${isEditing}`}
             initial={{ opacity: 0, scale: 0.95, y: 10 }}
             animate={{ opacity: 1, scale: 1, y: 0 }}
             exit={{ opacity: 0, scale: 0.95, y: -10 }}
@@ -224,13 +256,48 @@ export function QuoteCardsView({ quoteCards, title = 'Recording' }: QuoteCardsVi
               </>
             )}
             
-            <div className="relative z-10">
+            <div className="relative z-10 flex justify-between items-start">
               <Quote className={`w-10 h-10 ${getAccentColor()} opacity-60`} />
+              {onUpdateQuote && !isEditing && (
+                <button
+                  onClick={startEditing}
+                  className="p-2 rounded-full hover:bg-white/10 transition-colors"
+                >
+                  <Pencil className="w-4 h-4 opacity-60" />
+                </button>
+              )}
             </div>
             
-            <p className="text-2xl font-semibold leading-relaxed my-6 relative z-10">
-              "{currentCard.quote}"
-            </p>
+            {isEditing ? (
+              <div className="space-y-4 my-6 relative z-10">
+                <Textarea
+                  value={editedQuote}
+                  onChange={(e) => setEditedQuote(e.target.value)}
+                  className="bg-white/10 border-white/20 text-inherit resize-none"
+                  rows={3}
+                  maxLength={120}
+                  placeholder="Quote text..."
+                />
+                <Input
+                  value={editedSpeaker}
+                  onChange={(e) => setEditedSpeaker(e.target.value)}
+                  className="bg-white/10 border-white/20 text-inherit"
+                  placeholder="Speaker name..."
+                />
+                <div className="flex gap-2">
+                  <Button size="sm" onClick={saveEdit} className="gap-1">
+                    <Check className="w-3 h-3" /> Save
+                  </Button>
+                  <Button size="sm" variant="outline" onClick={cancelEdit}>
+                    Cancel
+                  </Button>
+                </div>
+              </div>
+            ) : (
+              <p className="text-2xl font-semibold leading-relaxed my-6 relative z-10">
+                "{currentCard.quote}"
+              </p>
+            )}
             
             <div className="flex items-center gap-3 relative z-10">
               <div className={`w-10 h-10 rounded-full ${backgroundImage || currentStyleKey !== 'minimal' && currentStyleKey !== 'student' ? 'bg-white/10' : 'bg-foreground/10'} flex items-center justify-center`}>
@@ -269,7 +336,7 @@ export function QuoteCardsView({ quoteCards, title = 'Recording' }: QuoteCardsVi
           {quoteCards.map((_, i) => (
             <button
               key={i}
-              onClick={() => setCurrentIndex(i)}
+              onClick={() => { setCurrentIndex(i); setIsEditing(false); }}
               className={`w-2.5 h-2.5 rounded-full transition-all duration-200 ${
                 i === currentIndex ? 'bg-primary w-6' : 'bg-muted-foreground/30 hover:bg-muted-foreground/50'
               }`}
@@ -286,14 +353,14 @@ export function QuoteCardsView({ quoteCards, title = 'Recording' }: QuoteCardsVi
         </Button>
         <Button variant="outline" onClick={handleSave}>
           <Download className="w-4 h-4 mr-2" />
-          Save
+          Save JPG
         </Button>
       </div>
       
       {quoteCards.length > 1 && (
         <Button variant="secondary" className="w-full" onClick={handleSaveAll}>
           <DownloadCloud className="w-4 h-4 mr-2" />
-          Save All ({quoteCards.length} cards)
+          Save All ({quoteCards.length} JPGs)
         </Button>
       )}
     </div>
