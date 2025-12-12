@@ -1,10 +1,16 @@
 import { useState } from 'react';
 import { motion } from 'framer-motion';
-import { Briefcase, GraduationCap, Target, ArrowRight, BookOpen, HelpCircle, Share2, Download, CheckSquare, Square } from 'lucide-react';
+import { Briefcase, GraduationCap, Target, ArrowRight, BookOpen, HelpCircle, Share2, Download, CheckSquare, Square, FileText, FileCode } from 'lucide-react';
 import { Tabs, TabsList, TabsTrigger, TabsContent } from '@/components/ui/tabs';
 import { Button } from '@/components/ui/button';
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuTrigger,
+} from '@/components/ui/dropdown-menu';
 import { Summary } from '@/types/recording';
-import { shareText, generateSummaryText, downloadTextFile } from '@/lib/shareUtils';
+import { shareText, generateSummaryText, downloadTextFile, downloadHtmlFile, generateSummaryHtml } from '@/lib/shareUtils';
 import { toast } from 'sonner';
 
 interface SummaryViewProps {
@@ -34,11 +40,18 @@ export function SummaryView({ summary, title = 'Recording' }: SummaryViewProps) 
     if (shared) toast.success('Summary shared!');
   };
 
-  const handleSave = () => {
+  const handleSaveText = () => {
     if (!summary) return;
     const text = generateSummaryText(summary, title);
     downloadTextFile(`${title.replace(/\s+/g, '_')}_summary.txt`, text);
-    toast.success('Summary saved to device');
+    toast.success('Summary saved as text');
+  };
+
+  const handleSaveHtml = () => {
+    if (!summary) return;
+    const html = generateSummaryHtml(summary, title);
+    downloadHtmlFile(`${title.replace(/\s+/g, '_')}_summary.html`, html);
+    toast.success('Summary saved as HTML');
   };
 
   if (!summary) {
@@ -225,10 +238,24 @@ export function SummaryView({ summary, title = 'Recording' }: SummaryViewProps) 
           <Share2 className="w-4 h-4 mr-2" />
           Share
         </Button>
-        <Button variant="outline" className="flex-1" onClick={handleSave}>
-          <Download className="w-4 h-4 mr-2" />
-          Save
-        </Button>
+        <DropdownMenu>
+          <DropdownMenuTrigger asChild>
+            <Button variant="outline" className="flex-1">
+              <Download className="w-4 h-4 mr-2" />
+              Save
+            </Button>
+          </DropdownMenuTrigger>
+          <DropdownMenuContent align="end">
+            <DropdownMenuItem onClick={handleSaveText}>
+              <FileText className="w-4 h-4 mr-2" />
+              Save as Text (.txt)
+            </DropdownMenuItem>
+            <DropdownMenuItem onClick={handleSaveHtml}>
+              <FileCode className="w-4 h-4 mr-2" />
+              Save as HTML
+            </DropdownMenuItem>
+          </DropdownMenuContent>
+        </DropdownMenu>
       </div>
     </div>
   );
