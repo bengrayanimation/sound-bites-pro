@@ -58,7 +58,7 @@ export function QuoteCardsView({ quoteCards, title = 'Recording', onUpdateQuote 
     const styleKey = styleKeys[currentStyleIndex];
     
     for (let i = 0; i < quoteCards.length; i++) {
-      const blob = await generateQuoteCardImage(quoteCards[i], styleKey, backgroundImage || undefined, 'jpg');
+      const blob = await generateQuoteCardImage(quoteCards[i], styleKey, backgroundImage || undefined);
       downloadFile(`${title.replace(/\s+/g, '_')}_quote_${i + 1}.jpg`, blob);
       await new Promise(resolve => setTimeout(resolve, 300));
     }
