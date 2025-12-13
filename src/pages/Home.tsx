@@ -249,7 +249,7 @@ export default function Home() {
               className="mb-8 flex flex-col items-center gap-6"
             >
               <Waveform isAnimating={isRecording} barCount={12} />
-              <Timer isRunning={isRecording} onTimeUpdate={() => {}} initialTime={duration} />
+              <Timer isRunning={isRecording} onTimeUpdate={() => {}} />
             </motion.div>
           )}
         </AnimatePresence>
