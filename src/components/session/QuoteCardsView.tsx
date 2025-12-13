@@ -25,19 +25,34 @@ const styleKeys = Object.keys(quoteCardStyles);
 
 export function QuoteCardsView({ quoteCards, title = 'Recording', onUpdateQuote }: QuoteCardsViewProps) {
   const [currentIndex, setCurrentIndex] = useState(0);
-  const [currentStyleIndex, setCurrentStyleIndex] = useState(0);
-  const [backgroundImage, setBackgroundImage] = useState<string | null>(null);
+  // Track individual styles for each quote card
+  const [cardStyles, setCardStyles] = useState<Record<string, number>>({});
+  // Track individual background images for each quote card
+  const [cardBackgrounds, setCardBackgrounds] = useState<Record<string, string>>({});
   const [isEditing, setIsEditing] = useState(false);
   const [editedQuote, setEditedQuote] = useState('');
   const [editedSpeaker, setEditedSpeaker] = useState('');
   const fileInputRef = useRef<HTMLInputElement>(null);
 
+  const getCurrentStyleIndex = (cardId: string) => {
+    return cardStyles[cardId] ?? 0;
+  };
+
+  const setCurrentStyleIndex = (cardId: string, styleIndex: number) => {
+    setCardStyles(prev => ({ ...prev, [cardId]: styleIndex }));
+  };
+
+  const getBackgroundImage = (cardId: string) => {
+    return cardBackgrounds[cardId] || null;
+  };
+
   const handleShare = async () => {
     if (!quoteCards || quoteCards.length === 0) return;
     const quote = quoteCards[currentIndex];
-    const styleKey = styleKeys[currentStyleIndex];
+    const styleKey = styleKeys[getCurrentStyleIndex(quote.id)];
+    const bg = getBackgroundImage(quote.id);
     toast.loading('Generating image...');
-    const shared = await shareQuoteAsImage(quote, styleKey, title, backgroundImage || undefined);
+    const shared = await shareQuoteAsImage(quote, styleKey, title, bg || undefined);
     toast.dismiss();
     if (shared) toast.success('Quote shared!');
   };
@@ -45,9 +60,10 @@ export function QuoteCardsView({ quoteCards, title = 'Recording', onUpdateQuote 
   const handleSave = async () => {
     if (!quoteCards || quoteCards.length === 0) return;
     const quote = quoteCards[currentIndex];
-    const styleKey = styleKeys[currentStyleIndex];
+    const styleKey = styleKeys[getCurrentStyleIndex(quote.id)];
+    const bg = getBackgroundImage(quote.id);
     toast.loading('Generating JPG...');
-    await downloadQuoteAsJpg(quote, styleKey, `${title.replace(/\s+/g, '_')}_quote_${currentIndex + 1}.jpg`, backgroundImage || undefined);
+    await downloadQuoteAsJpg(quote, styleKey, `${title.replace(/\s+/g, '_')}_quote_${currentIndex + 1}.jpg`, bg || undefined);
     toast.dismiss();
     toast.success('Quote card saved as JPG');
   };
@@ -55,10 +71,12 @@ export function QuoteCardsView({ quoteCards, title = 'Recording', onUpdateQuote 
   const handleSaveAll = async () => {
     if (!quoteCards || quoteCards.length === 0) return;
     toast.loading('Generating all quote cards...');
-    const styleKey = styleKeys[currentStyleIndex];
     
     for (let i = 0; i < quoteCards.length; i++) {
-      const blob = await generateQuoteCardImage(quoteCards[i], styleKey, backgroundImage || undefined);
+      const quote = quoteCards[i];
+      const styleKey = styleKeys[getCurrentStyleIndex(quote.id)];
+      const bg = getBackgroundImage(quote.id);
+      const blob = await generateQuoteCardImage(quote, styleKey, bg || undefined);
       downloadFile(`${title.replace(/\s+/g, '_')}_quote_${i + 1}.jpg`, blob);
       await new Promise(resolve => setTimeout(resolve, 300));
     }
@@ -69,17 +87,27 @@ export function QuoteCardsView({ quoteCards, title = 'Recording', onUpdateQuote 
 
   const handleImageUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
-    if (file) {
+    if (file && quoteCards) {
       const reader = new FileReader();
       reader.onload = (event) => {
-        setBackgroundImage(event.target?.result as string);
+        const cardId = quoteCards[currentIndex].id;
+        setCardBackgrounds(prev => ({
+          ...prev,
+          [cardId]: event.target?.result as string
+        }));
       };
       reader.readAsDataURL(file);
     }
   };
 
   const removeBackgroundImage = () => {
-    setBackgroundImage(null);
+    if (!quoteCards) return;
+    const cardId = quoteCards[currentIndex].id;
+    setCardBackgrounds(prev => {
+      const newBgs = { ...prev };
+      delete newBgs[cardId];
+      return newBgs;
+    });
     if (fileInputRef.current) {
       fileInputRef.current.value = '';
     }
@@ -126,7 +154,9 @@ export function QuoteCardsView({ quoteCards, title = 'Recording', onUpdateQuote 
   }
 
   const currentCard = quoteCards[currentIndex];
+  const currentStyleIndex = getCurrentStyleIndex(currentCard.id);
   const currentStyleKey = styleKeys[currentStyleIndex];
+  const backgroundImage = getBackgroundImage(currentCard.id);
 
   const nextCard = () => {
     setCurrentIndex((i) => (i + 1) % quoteCards.length);
@@ -189,12 +219,12 @@ export function QuoteCardsView({ quoteCards, title = 'Recording', onUpdateQuote 
 
   return (
     <div className="space-y-6">
-      {/* Style color buttons */}
+      {/* Style color buttons - individual per card */}
       <div className="flex flex-wrap justify-center gap-2">
         {styleKeys.map((key, i) => (
           <button
             key={key}
-            onClick={() => setCurrentStyleIndex(i)}
+            onClick={() => setCurrentStyleIndex(currentCard.id, i)}
             className={`w-8 h-8 rounded-full border-2 transition-all ${
               i === currentStyleIndex ? 'scale-110 ring-2 ring-primary ring-offset-2 ring-offset-background' : 'opacity-60 hover:opacity-100'
             }`}

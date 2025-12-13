@@ -1,6 +1,6 @@
-import { useState } from 'react';
+import { useState, useRef, useEffect } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
-import { Film, Play, Share2, Download, Sparkles, Pause, Clock, Video, Music, Loader2 } from 'lucide-react';
+import { Film, Play, Share2, Download, Sparkles, Pause, Clock, Video, Music, Loader2, Image as ImageIcon } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { HighlightReel, TranscriptSegment } from '@/types/recording';
@@ -17,6 +17,7 @@ interface VideoScene {
   caption: string;
   visualDescription: string;
   transition: string;
+  imageUrl?: string;
 }
 
 interface VideoStoryboard {
@@ -36,14 +37,60 @@ interface HighlightReelViewProps {
   duration: number;
   title?: string;
   transcript?: TranscriptSegment[];
+  audioUrl?: string;
 }
 
-export function HighlightReelView({ highlightReel, duration, title = 'Recording', transcript }: HighlightReelViewProps) {
+export function HighlightReelView({ highlightReel, duration, title = 'Recording', transcript, audioUrl }: HighlightReelViewProps) {
   const [isPlaying, setIsPlaying] = useState(false);
   const [activeTab, setActiveTab] = useState<'audio' | 'video'>('audio');
   const [isGeneratingVideo, setIsGeneratingVideo] = useState(false);
   const [videoStoryboard, setVideoStoryboard] = useState<VideoStoryboard | null>(null);
   const [currentSceneIndex, setCurrentSceneIndex] = useState(0);
+  const [currentMomentIndex, setCurrentMomentIndex] = useState(0);
+  const audioRef = useRef<HTMLAudioElement | null>(null);
+  const videoIntervalRef = useRef<NodeJS.Timeout | null>(null);
+
+  // Initialize audio for highlight reel playback
+  useEffect(() => {
+    if (audioUrl && highlightReel) {
+      audioRef.current = new Audio(audioUrl);
+      
+      audioRef.current.addEventListener('ended', () => {
+        setIsPlaying(false);
+        setCurrentMomentIndex(0);
+      });
+
+      return () => {
+        if (audioRef.current) {
+          audioRef.current.pause();
+          audioRef.current = null;
+        }
+      };
+    }
+  }, [audioUrl, highlightReel]);
+
+  const handlePlayPause = async () => {
+    if (!audioRef.current || !highlightReel) {
+      toast.error('No audio available');
+      return;
+    }
+
+    try {
+      if (isPlaying) {
+        audioRef.current.pause();
+        setIsPlaying(false);
+      } else {
+        // Start from the first moment
+        const startTime = highlightReel.moments[currentMomentIndex]?.startTime || 0;
+        audioRef.current.currentTime = startTime;
+        await audioRef.current.play();
+        setIsPlaying(true);
+      }
+    } catch (error) {
+      console.error('Playback error:', error);
+      toast.error('Failed to play highlight reel');
+    }
+  };
 
   const handleShare = async () => {
     if (!highlightReel) return;
@@ -81,14 +128,15 @@ export function HighlightReelView({ highlightReel, duration, title = 'Recording'
     if (!highlightReel) return;
     
     setIsGeneratingVideo(true);
-    toast.loading('Generating AI video storyboard...', { id: 'video-gen' });
+    toast.loading('Generating AI video with images...', { id: 'video-gen' });
     
     try {
       const { data, error } = await supabase.functions.invoke('generate-highlight-video', {
         body: {
           highlightReel,
           title,
-          transcript
+          transcript,
+          generateImages: true
         }
       });
 
@@ -97,7 +145,7 @@ export function HighlightReelView({ highlightReel, duration, title = 'Recording'
       if (data?.videoStoryboard) {
         setVideoStoryboard(data.videoStoryboard);
         setActiveTab('video');
-        toast.success('Video storyboard generated!', { id: 'video-gen' });
+        toast.success('Video storyboard with images generated!', { id: 'video-gen' });
       } else {
         throw new Error('No video data returned');
       }
@@ -108,6 +156,27 @@ export function HighlightReelView({ highlightReel, duration, title = 'Recording'
       setIsGeneratingVideo(false);
     }
   };
+
+  // Auto-advance video scenes
+  useEffect(() => {
+    if (activeTab === 'video' && videoStoryboard && isPlaying) {
+      videoIntervalRef.current = setInterval(() => {
+        setCurrentSceneIndex(prev => {
+          if (prev >= videoStoryboard.scenes.length - 1) {
+            setIsPlaying(false);
+            return 0;
+          }
+          return prev + 1;
+        });
+      }, 10000); // 10 seconds per scene for 60s total with ~6 scenes
+
+      return () => {
+        if (videoIntervalRef.current) {
+          clearInterval(videoIntervalRef.current);
+        }
+      };
+    }
+  }, [activeTab, videoStoryboard, isPlaying]);
 
   if (!highlightReel) {
     return (
@@ -162,8 +231,15 @@ export function HighlightReelView({ highlightReel, duration, title = 'Recording'
                 <motion.div
                   key={i}
                   initial={{ scaleY: 0 }}
-                  animate={{ scaleY: 1 }}
-                  transition={{ delay: i * 0.02, duration: 0.3 }}
+                  animate={{ 
+                    scaleY: isPlaying ? [0.3, 1, 0.5, 0.8, 0.3] : 1 
+                  }}
+                  transition={{ 
+                    delay: isPlaying ? 0 : i * 0.02, 
+                    duration: isPlaying ? 0.5 : 0.3,
+                    repeat: isPlaying ? Infinity : 0,
+                    repeatDelay: Math.random() * 0.2
+                  }}
                   className="flex-1 bg-background/20 rounded-full"
                   style={{ height: `${bar.height}%` }}
                 />
@@ -173,7 +249,7 @@ export function HighlightReelView({ highlightReel, duration, title = 'Recording'
             <motion.button
               whileHover={{ scale: 1.05 }}
               whileTap={{ scale: 0.95 }}
-              onClick={() => setIsPlaying(!isPlaying)}
+              onClick={handlePlayPause}
               className="relative z-10 w-20 h-20 rounded-full bg-primary flex items-center justify-center shadow-record"
             >
               {isPlaying ? (
@@ -206,7 +282,15 @@ export function HighlightReelView({ highlightReel, duration, title = 'Recording'
                   initial={{ opacity: 0, x: -10 }}
                   animate={{ opacity: 1, x: 0 }}
                   transition={{ delay: i * 0.05 }}
-                  className="flex items-start gap-3 p-4 bg-card border border-border rounded-xl hover:border-primary/30 transition-colors cursor-pointer group"
+                  onClick={() => {
+                    setCurrentMomentIndex(i);
+                    if (audioRef.current) {
+                      audioRef.current.currentTime = moment.startTime;
+                    }
+                  }}
+                  className={`flex items-start gap-3 p-4 bg-card border rounded-xl transition-all cursor-pointer group ${
+                    i === currentMomentIndex ? 'border-primary' : 'border-border hover:border-primary/30'
+                  }`}
                 >
                   <div className="w-8 h-8 rounded-lg bg-primary/10 flex items-center justify-center group-hover:bg-primary/20 transition-colors">
                     <Play className="w-3.5 h-3.5 text-primary fill-primary" />
@@ -226,50 +310,83 @@ export function HighlightReelView({ highlightReel, duration, title = 'Recording'
         <TabsContent value="video" className="space-y-6 mt-6">
           {videoStoryboard ? (
             <>
-              {/* Video Storyboard preview */}
+              {/* Video Storyboard preview with AI images */}
               <motion.div
                 initial={{ opacity: 0, y: 10 }}
                 animate={{ opacity: 1, y: 0 }}
                 className="relative rounded-2xl aspect-video overflow-hidden shadow-xl"
-                style={{
-                  background: `linear-gradient(135deg, ${videoStoryboard.colorPalette[0] || '#1a1a2e'}, ${videoStoryboard.colorPalette[1] || '#D4A574'})`
-                }}
               >
-                <div className="absolute inset-0 flex items-center justify-center">
-                  <AnimatePresence mode="wait">
-                    <motion.div
-                      key={currentSceneIndex}
-                      initial={{ opacity: 0, scale: 0.9 }}
-                      animate={{ opacity: 1, scale: 1 }}
-                      exit={{ opacity: 0, scale: 1.1 }}
-                      className="text-center p-8"
-                    >
-                      <p className="text-white/60 text-sm mb-2">
+                <AnimatePresence mode="wait">
+                  <motion.div
+                    key={currentSceneIndex}
+                    initial={{ opacity: 0, scale: 1.1 }}
+                    animate={{ opacity: 1, scale: 1 }}
+                    exit={{ opacity: 0, scale: 0.9 }}
+                    transition={{ duration: 0.5 }}
+                    className="absolute inset-0"
+                  >
+                    {/* Background - AI image or gradient */}
+                    {videoStoryboard.scenes[currentSceneIndex]?.imageUrl ? (
+                      <img 
+                        src={videoStoryboard.scenes[currentSceneIndex].imageUrl}
+                        alt={videoStoryboard.scenes[currentSceneIndex].caption}
+                        className="w-full h-full object-cover"
+                      />
+                    ) : (
+                      <div 
+                        className="w-full h-full"
+                        style={{
+                          background: `linear-gradient(135deg, ${videoStoryboard.colorPalette[currentSceneIndex % videoStoryboard.colorPalette.length] || '#1a1a2e'}, ${videoStoryboard.colorPalette[(currentSceneIndex + 1) % videoStoryboard.colorPalette.length] || '#D4A574'})`
+                        }}
+                      />
+                    )}
+                    
+                    {/* Overlay for text readability */}
+                    <div className="absolute inset-0 bg-gradient-to-t from-black/80 via-black/20 to-black/40" />
+                    
+                    {/* Content overlay */}
+                    <div className="absolute inset-0 flex flex-col justify-end p-6">
+                      <p className="text-white/60 text-sm mb-1">
                         Scene {videoStoryboard.scenes[currentSceneIndex]?.sceneNumber || 1}
                       </p>
-                      <p className="text-white text-xl font-semibold mb-4">
+                      <p className="text-white text-xl font-bold mb-2">
                         {videoStoryboard.scenes[currentSceneIndex]?.caption || 'Loading...'}
                       </p>
-                      <p className="text-white/80 text-sm max-w-md mx-auto">
+                      <p className="text-white/80 text-sm max-w-md">
                         {videoStoryboard.scenes[currentSceneIndex]?.visualDescription || ''}
                       </p>
-                    </motion.div>
-                  </AnimatePresence>
-                </div>
+                    </div>
+                  </motion.div>
+                </AnimatePresence>
 
-                <div className="absolute bottom-4 left-4 right-4 flex items-center gap-2">
+                {/* Play/Pause button for video */}
+                <motion.button
+                  whileHover={{ scale: 1.1 }}
+                  whileTap={{ scale: 0.9 }}
+                  onClick={() => setIsPlaying(!isPlaying)}
+                  className="absolute top-4 right-4 w-10 h-10 rounded-full bg-white/20 backdrop-blur-sm flex items-center justify-center"
+                >
+                  {isPlaying ? (
+                    <Pause className="w-5 h-5 text-white fill-white" />
+                  ) : (
+                    <Play className="w-5 h-5 text-white fill-white ml-0.5" />
+                  )}
+                </motion.button>
+
+                {/* Scene progress bar */}
+                <div className="absolute bottom-0 left-0 right-0 flex items-center gap-1 p-4">
                   {videoStoryboard.scenes.map((_, i) => (
                     <button
                       key={i}
                       onClick={() => setCurrentSceneIndex(i)}
-                      className={`flex-1 h-1.5 rounded-full transition-all ${
-                        i === currentSceneIndex ? 'bg-white' : 'bg-white/30'
+                      className={`flex-1 h-1 rounded-full transition-all ${
+                        i === currentSceneIndex ? 'bg-white' : i < currentSceneIndex ? 'bg-white/60' : 'bg-white/30'
                       }`}
                     />
                   ))}
                 </div>
 
-                <div className="absolute top-4 right-4 px-3 py-1.5 bg-white/20 rounded-full text-xs font-semibold text-white backdrop-blur-sm">
+                <div className="absolute top-4 left-4 px-3 py-1.5 bg-white/20 rounded-full text-xs font-semibold text-white backdrop-blur-sm">
                   {videoStoryboard.style}
                 </div>
               </motion.div>
@@ -292,14 +409,22 @@ export function HighlightReelView({ highlightReel, duration, title = 'Recording'
                         i === currentSceneIndex ? 'border-primary' : 'border-border hover:border-primary/30'
                       }`}
                     >
-                      <div 
-                        className="w-12 h-12 rounded-lg flex items-center justify-center text-white font-bold"
-                        style={{
-                          background: `linear-gradient(135deg, ${videoStoryboard.colorPalette[i % videoStoryboard.colorPalette.length] || '#D4A574'}, ${videoStoryboard.colorPalette[(i + 1) % videoStoryboard.colorPalette.length] || '#1a1a2e'})`
-                        }}
-                      >
-                        {scene.sceneNumber}
-                      </div>
+                      {scene.imageUrl ? (
+                        <img 
+                          src={scene.imageUrl}
+                          alt={scene.caption}
+                          className="w-12 h-12 rounded-lg object-cover"
+                        />
+                      ) : (
+                        <div 
+                          className="w-12 h-12 rounded-lg flex items-center justify-center text-white font-bold"
+                          style={{
+                            background: `linear-gradient(135deg, ${videoStoryboard.colorPalette[i % videoStoryboard.colorPalette.length] || '#D4A574'}, ${videoStoryboard.colorPalette[(i + 1) % videoStoryboard.colorPalette.length] || '#1a1a2e'})`
+                          }}
+                        >
+                          {scene.sceneNumber}
+                        </div>
+                      )}
                       <div className="flex-1 min-w-0">
                         <p className="text-sm font-medium text-foreground">{scene.caption}</p>
                         <p className="text-xs text-muted-foreground mt-1 line-clamp-2">
@@ -317,7 +442,7 @@ export function HighlightReelView({ highlightReel, duration, title = 'Recording'
           ) : (
             <div className="flex flex-col items-center justify-center py-12 text-center">
               <p className="text-muted-foreground mb-4">
-                Generate an AI video version of your highlight reel
+                Generate an AI video version with images and quotes
               </p>
               <Button onClick={generateVideoVersion} disabled={isGeneratingVideo}>
                 {isGeneratingVideo ? (
@@ -327,8 +452,8 @@ export function HighlightReelView({ highlightReel, duration, title = 'Recording'
                   </>
                 ) : (
                   <>
-                    <Video className="w-4 h-4 mr-2" />
-                    Generate Video
+                    <ImageIcon className="w-4 h-4 mr-2" />
+                    Generate Video with AI Images
                   </>
                 )}
               </Button>
@@ -352,8 +477,8 @@ export function HighlightReelView({ highlightReel, duration, title = 'Recording'
             </>
           ) : (
             <>
-              <Video className="w-4 h-4 mr-2" />
-              Generate AI Video Version
+              <ImageIcon className="w-4 h-4 mr-2" />
+              Generate AI Video with Images
             </>
           )}
         </Button>

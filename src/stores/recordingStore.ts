@@ -59,11 +59,7 @@ export const createRecordingTemplate = (
       keyQuote: "Wrapping up the discussion." 
     },
   ],
-  checkpoints: [
-    { id: 'cp1', type: 'task', text: 'Follow up on discussion points', timestamp: Math.floor(duration / 4) },
-    { id: 'cp2', type: 'decision', text: 'Key decision made during recording', timestamp: Math.floor(duration / 2) },
-    { id: 'cp3', type: 'question', text: 'Question raised for future consideration', timestamp: Math.floor(duration * 3 / 4) },
-  ],
+  notes: '',
   summary: {
     executive: {
       keyPoints: ['Main topic discussed', 'Key insights shared', 'Important conclusions reached'],
@@ -106,6 +102,7 @@ const demoRecordings: Recording[] = [
     createdAt: new Date(Date.now() - 2 * 60 * 60 * 1000),
     isPinned: true,
     isTranscribed: true,
+    notes: '## Meeting Notes\n\n• Auth module completed by Mike\n• Dashboard in progress by Emily\n• API keys pending from DevOps\n\n> "We\'re on track for Friday deadline" - Sarah',
     transcript: [
       { id: 't1', text: "Good morning everyone. Let's start with updates from the team.", startTime: 0, endTime: 5, speaker: 'Sarah' },
       { id: 't2', text: "I finished the authentication module yesterday and ran all the unit tests.", startTime: 5, endTime: 12, speaker: 'Mike' },
@@ -140,12 +137,6 @@ const demoRecordings: Recording[] = [
         bullets: ['API keys pending', 'DevOps coordination needed'], 
         keyQuote: "Should have everything resolved by noon." 
       },
-    ],
-    checkpoints: [
-      { id: 'cp1', type: 'task', text: 'Complete dashboard by Friday', timestamp: 120 },
-      { id: 'cp2', type: 'decision', text: 'Use React Query for data fetching', timestamp: 180 },
-      { id: 'cp3', type: 'task', text: 'Get API keys from DevOps', timestamp: 200 },
-      { id: 'cp4', type: 'question', text: 'What testing framework for E2E?', timestamp: 240 },
     ],
     summary: {
       executive: {
@@ -188,6 +179,7 @@ const demoRecordings: Recording[] = [
     createdAt: new Date(Date.now() - 26 * 60 * 60 * 1000),
     isPinned: true,
     isTranscribed: true,
+    notes: '## Product Ideas for Q2\n\n1. AI-powered summaries - top priority\n2. Mobile redesign for Q3\n3. Export improvements\n\n> "AI-powered features will set us apart from the competition" - Product Lead\n\n**Action items:**\n• Design mockups due next week\n• Engineering spike on AI integration',
     transcript: [
       { id: 't1', text: "Let's explore new feature ideas for Q2.", startTime: 0, endTime: 4, speaker: 'Product Lead' },
       { id: 't2', text: "I've been hearing a lot of requests for AI-powered summaries.", startTime: 4, endTime: 10, speaker: 'Designer' },
@@ -199,12 +191,6 @@ const demoRecordings: Recording[] = [
       { id: 'c1', title: 'Feature Ideation', startTime: 0, endTime: 600, bullets: ['AI summaries', 'Export improvements', 'Mobile redesign'], keyQuote: 'AI-powered features are the future.' },
       { id: 'c2', title: 'Prioritization', startTime: 600, endTime: 1200, bullets: ['Impact scoring', 'Resource allocation'], keyQuote: 'Focus on high-impact, low-effort wins.' },
       { id: 'c3', title: 'Timeline Planning', startTime: 1200, endTime: 1847, bullets: ['Sprint planning', 'Milestone setting'], keyQuote: 'Two-week prototype cycle.' },
-    ],
-    checkpoints: [
-      { id: 'cp1', type: 'decision', text: 'Prioritize AI summaries for Q2', timestamp: 300 },
-      { id: 'cp2', type: 'task', text: 'Create design mockups by next week', timestamp: 800 },
-      { id: 'cp3', type: 'task', text: 'Engineering spike on AI integration', timestamp: 1100 },
-      { id: 'cp4', type: 'question', text: 'Which AI provider to use?', timestamp: 1400 },
     ],
     summary: {
       executive: {

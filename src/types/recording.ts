@@ -8,7 +8,7 @@ export interface Recording {
   isTranscribed: boolean;
   transcript?: TranscriptSegment[];
   chapters?: Chapter[];
-  checkpoints?: Checkpoint[];
+  notes?: string;
   summary?: Summary;
   quoteCards?: QuoteCard[];
   highlightReel?: HighlightReel;
@@ -29,13 +29,6 @@ export interface Chapter {
   endTime: number;
   bullets: string[];
   keyQuote?: string;
-}
-
-export interface Checkpoint {
-  id: string;
-  type: 'decision' | 'task' | 'definition' | 'question';
-  text: string;
-  timestamp: number;
 }
 
 export interface Summary {

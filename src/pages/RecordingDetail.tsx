@@ -12,7 +12,7 @@ import {
 } from '@/components/ui/dropdown-menu';
 import { AudioPlayer } from '@/components/session/AudioPlayer';
 import { TranscriptView } from '@/components/session/TranscriptView';
-import { CheckpointsView } from '@/components/session/CheckpointsView';
+import { NotesView } from '@/components/session/NotesView';
 import { SummaryView } from '@/components/session/SummaryView';
 import { TranslateView } from '@/components/session/TranslateView';
 import { QuoteCardsView } from '@/components/session/QuoteCardsView';
@@ -20,11 +20,12 @@ import { HighlightReelView } from '@/components/session/HighlightReelView';
 import { useRecordingStore } from '@/stores/recordingStore';
 import { formatDuration } from '@/lib/formatters';
 import { toast } from '@/hooks/use-toast';
+import { QuoteCard } from '@/types/recording';
 
 export default function RecordingDetail() {
   const { id } = useParams<{ id: string }>();
   const navigate = useNavigate();
-  const { recordings, togglePin, deleteRecording } = useRecordingStore();
+  const { recordings, togglePin, deleteRecording, updateRecording } = useRecordingStore();
 
   const recording = recordings.find((r) => r.id === id);
 
@@ -55,10 +56,21 @@ export default function RecordingDetail() {
     });
   };
 
+  const handleUpdateQuote = (index: number, quote: QuoteCard) => {
+    if (!recording.quoteCards) return;
+    const newQuoteCards = [...recording.quoteCards];
+    newQuoteCards[index] = quote;
+    updateRecording(recording.id, { quoteCards: newQuoteCards });
+  };
+
+  const handleUpdateNotes = (notes: string) => {
+    updateRecording(recording.id, { notes });
+  };
+
   const tabs = [
     { value: 'audio', label: 'Audio' },
     { value: 'transcript', label: 'Transcript' },
-    { value: 'checkpoints', label: 'Checkpoints' },
+    { value: 'notes', label: 'Notes' },
     { value: 'summary', label: 'Summary' },
     { value: 'translate', label: 'Translate' },
     { value: 'quotes', label: 'Quotes' },
@@ -152,6 +164,7 @@ export default function RecordingDetail() {
               duration={recording.duration} 
               title={recording.title} 
               chapters={recording.chapters}
+              audioUrl={recording.audioUrl}
             />
           </TabsContent>
 
@@ -159,8 +172,12 @@ export default function RecordingDetail() {
             <TranscriptView transcript={recording.transcript} title={recording.title} />
           </TabsContent>
 
-          <TabsContent value="checkpoints" className="mt-0 animate-fade-in">
-            <CheckpointsView checkpoints={recording.checkpoints} />
+          <TabsContent value="notes" className="mt-0 animate-fade-in">
+            <NotesView 
+              notes={recording.notes} 
+              title={recording.title}
+              onUpdateNotes={handleUpdateNotes}
+            />
           </TabsContent>
 
           <TabsContent value="summary" className="mt-0 animate-fade-in">
@@ -172,11 +189,21 @@ export default function RecordingDetail() {
           </TabsContent>
 
           <TabsContent value="quotes" className="mt-0 animate-fade-in">
-            <QuoteCardsView quoteCards={recording.quoteCards} title={recording.title} />
+            <QuoteCardsView 
+              quoteCards={recording.quoteCards} 
+              title={recording.title}
+              onUpdateQuote={handleUpdateQuote}
+            />
           </TabsContent>
 
           <TabsContent value="highlights" className="mt-0 animate-fade-in">
-            <HighlightReelView highlightReel={recording.highlightReel} duration={recording.duration} title={recording.title} />
+            <HighlightReelView 
+              highlightReel={recording.highlightReel} 
+              duration={recording.duration} 
+              title={recording.title}
+              transcript={recording.transcript}
+              audioUrl={recording.audioUrl}
+            />
           </TabsContent>
         </Tabs>
       </main>

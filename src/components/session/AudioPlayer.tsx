@@ -1,10 +1,10 @@
-import { useState } from 'react';
+import { useState, useRef, useEffect } from 'react';
 import { motion } from 'framer-motion';
 import { Play, Pause, SkipBack, SkipForward, Volume2, Share2, Download, BookOpen, Quote } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Slider } from '@/components/ui/slider';
 import { formatTime } from '@/lib/formatters';
-import { shareText, downloadTextFile } from '@/lib/shareUtils';
+import { shareText } from '@/lib/shareUtils';
 import { toast } from 'sonner';
 import { Chapter } from '@/types/recording';
 
@@ -14,14 +14,91 @@ interface AudioPlayerProps {
   onSeek?: (time: number) => void;
   title?: string;
   chapters?: Chapter[];
+  audioUrl?: string;
 }
 
-export function AudioPlayer({ duration, currentTime = 0, onSeek, title = 'Recording', chapters }: AudioPlayerProps) {
+export function AudioPlayer({ duration, currentTime = 0, onSeek, title = 'Recording', chapters, audioUrl }: AudioPlayerProps) {
   const [isPlaying, setIsPlaying] = useState(false);
   const [playbackSpeed, setPlaybackSpeed] = useState(1);
   const [position, setPosition] = useState(currentTime);
+  const audioRef = useRef<HTMLAudioElement | null>(null);
+  const animationRef = useRef<number | null>(null);
 
   const speeds = [0.5, 0.75, 1, 1.25, 1.5, 2];
+
+  // Initialize audio element
+  useEffect(() => {
+    if (audioUrl) {
+      audioRef.current = new Audio(audioUrl);
+      audioRef.current.playbackRate = playbackSpeed;
+      
+      audioRef.current.addEventListener('ended', () => {
+        setIsPlaying(false);
+        setPosition(0);
+      });
+
+      audioRef.current.addEventListener('loadedmetadata', () => {
+        // Audio is ready
+      });
+
+      return () => {
+        if (audioRef.current) {
+          audioRef.current.pause();
+          audioRef.current = null;
+        }
+        if (animationRef.current) {
+          cancelAnimationFrame(animationRef.current);
+        }
+      };
+    }
+  }, [audioUrl]);
+
+  // Update position during playback
+  useEffect(() => {
+    const updatePosition = () => {
+      if (audioRef.current && isPlaying) {
+        setPosition(audioRef.current.currentTime);
+        animationRef.current = requestAnimationFrame(updatePosition);
+      }
+    };
+
+    if (isPlaying && audioRef.current) {
+      animationRef.current = requestAnimationFrame(updatePosition);
+    }
+
+    return () => {
+      if (animationRef.current) {
+        cancelAnimationFrame(animationRef.current);
+      }
+    };
+  }, [isPlaying]);
+
+  // Update playback speed
+  useEffect(() => {
+    if (audioRef.current) {
+      audioRef.current.playbackRate = playbackSpeed;
+    }
+  }, [playbackSpeed]);
+
+  const handlePlayPause = async () => {
+    if (!audioRef.current) {
+      toast.error('No audio available');
+      return;
+    }
+
+    try {
+      if (isPlaying) {
+        audioRef.current.pause();
+        setIsPlaying(false);
+      } else {
+        await audioRef.current.play();
+        setIsPlaying(true);
+      }
+    } catch (error) {
+      console.error('Playback error:', error);
+      toast.error('Failed to play audio');
+    }
+  };
 
   const handleSpeedChange = () => {
     const currentIndex = speeds.indexOf(playbackSpeed);
@@ -30,12 +107,19 @@ export function AudioPlayer({ duration, currentTime = 0, onSeek, title = 'Record
   };
 
   const handleSeek = (value: number[]) => {
-    setPosition(value[0]);
-    onSeek?.(value[0]);
+    const newPosition = value[0];
+    setPosition(newPosition);
+    if (audioRef.current) {
+      audioRef.current.currentTime = newPosition;
+    }
+    onSeek?.(newPosition);
   };
 
   const jumpToTime = (time: number) => {
     setPosition(time);
+    if (audioRef.current) {
+      audioRef.current.currentTime = time;
+    }
     onSeek?.(time);
     toast.success(`Jumped to ${formatTime(time)}`);
   };
@@ -43,12 +127,18 @@ export function AudioPlayer({ duration, currentTime = 0, onSeek, title = 'Record
   const skipBackward = () => {
     const newPos = Math.max(0, position - 15);
     setPosition(newPos);
+    if (audioRef.current) {
+      audioRef.current.currentTime = newPos;
+    }
     onSeek?.(newPos);
   };
 
   const skipForward = () => {
     const newPos = Math.min(duration, position + 15);
     setPosition(newPos);
+    if (audioRef.current) {
+      audioRef.current.currentTime = newPos;
+    }
     onSeek?.(newPos);
   };
 
@@ -59,7 +149,17 @@ export function AudioPlayer({ duration, currentTime = 0, onSeek, title = 'Record
   };
 
   const handleSave = () => {
-    toast.success('Audio would be saved to device (demo mode)');
+    if (audioUrl) {
+      const link = document.createElement('a');
+      link.href = audioUrl;
+      link.download = `${title.replace(/\s+/g, '_')}.webm`;
+      document.body.appendChild(link);
+      link.click();
+      document.body.removeChild(link);
+      toast.success('Audio saved!');
+    } else {
+      toast.error('No audio available to save');
+    }
   };
 
   // Generate waveform bars with varied heights
@@ -133,7 +233,7 @@ export function AudioPlayer({ duration, currentTime = 0, onSeek, title = 'Record
             variant="default"
             size="icon"
             className="w-16 h-16 rounded-full shadow-record"
-            onClick={() => setIsPlaying(!isPlaying)}
+            onClick={handlePlayPause}
           >
             {isPlaying ? (
               <Pause className="w-7 h-7 fill-current" />
