@@ -7,6 +7,7 @@ import { Waveform } from '@/components/Waveform';
 import { Timer } from '@/components/Timer';
 import { PinnedRecordings } from '@/components/PinnedRecordings';
 import { Paywall } from '@/components/Paywall';
+import { NotesEditor } from '@/components/NotesEditor';
 import { Button } from '@/components/ui/button';
 import { useRecordingStore, createRecordingTemplate } from '@/stores/recordingStore';
 import { useAudioRecorder } from '@/hooks/useAudioRecorder';
@@ -18,6 +19,7 @@ export default function Home() {
   const navigate = useNavigate();
   const [showPaywall, setShowPaywall] = useState(false);
   const [isProcessing, setIsProcessing] = useState(false);
+  const [recordingNotes, setRecordingNotes] = useState('');
   
   const { 
     recordings, 
@@ -86,6 +88,7 @@ export default function Home() {
       isPinned: false,
       isTranscribed: false,
       audioUrl: audioBase64,
+      notes: recordingNotes, // Save notes from recording session
     };
     
     addRecording(newRecording);
@@ -100,7 +103,6 @@ export default function Home() {
           isTranscribed: true,
           transcript: result.transcript,
           chapters: result.chapters,
-          checkpoints: result.checkpoints,
           summary: result.summary,
           quoteCards: result.quoteCards,
           highlightReel: result.highlightReel,
@@ -119,7 +121,6 @@ export default function Home() {
           isTranscribed: true,
           transcript: template.transcript,
           chapters: template.chapters,
-          checkpoints: template.checkpoints,
           summary: template.summary,
           quoteCards: template.quoteCards,
           highlightReel: template.highlightReel,
@@ -134,6 +135,7 @@ export default function Home() {
       toast.error('Failed to process recording', { id: 'transcription' });
     } finally {
       setIsProcessing(false);
+      setRecordingNotes(''); // Clear notes after saving
       resetRecorder();
     }
   };
@@ -151,6 +153,7 @@ export default function Home() {
         decrementFreeRecordings();
       }
       
+      setRecordingNotes(''); // Reset notes for new recording
       await startRecording();
     }
   }, [isRecording, isPro, freeRecordingsLeft, startRecording, stopRecording, decrementFreeRecordings]);
@@ -259,6 +262,17 @@ export default function Home() {
           <RecordButton isRecording={isRecording} onToggle={handleRecordToggle} />
         )}
       </main>
+
+      {/* Notes editor - shown during recording */}
+      <AnimatePresence>
+        {isRecording && (
+          <NotesEditor
+            notes={recordingNotes}
+            onNotesChange={setRecordingNotes}
+            isRecording={isRecording}
+          />
+        )}
+      </AnimatePresence>
 
       {/* Bottom navigation */}
       <nav className="fixed bottom-0 left-0 right-0 p-4 pb-8 flex justify-end">
