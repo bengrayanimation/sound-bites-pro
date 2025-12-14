@@ -1,6 +1,6 @@
 import { useState } from 'react';
 import { motion } from 'framer-motion';
-import { Briefcase, GraduationCap, Target, ArrowRight, BookOpen, HelpCircle, Share2, Download, CheckSquare, Square, FileText, FileCode } from 'lucide-react';
+import { Briefcase, GraduationCap, Target, ArrowRight, BookOpen, HelpCircle, Share2, Download, CheckSquare, Square, FileText, FileCode, Printer } from 'lucide-react';
 import { Tabs, TabsList, TabsTrigger, TabsContent } from '@/components/ui/tabs';
 import { Button } from '@/components/ui/button';
 import {
@@ -10,7 +10,7 @@ import {
   DropdownMenuTrigger,
 } from '@/components/ui/dropdown-menu';
 import { Summary } from '@/types/recording';
-import { shareText, generateSummaryText, downloadTextFile, downloadHtmlFile, generateSummaryHtml } from '@/lib/shareUtils';
+import { shareText, generateSummaryText, downloadTextFile, downloadHtmlFile, generateSummaryHtml, downloadPdfFile } from '@/lib/shareUtils';
 import { toast } from 'sonner';
 
 interface SummaryViewProps {
@@ -52,6 +52,13 @@ export function SummaryView({ summary, title = 'Recording' }: SummaryViewProps) 
     const html = generateSummaryHtml(summary, title);
     downloadHtmlFile(`${title.replace(/\s+/g, '_')}_summary.html`, html);
     toast.success('Summary saved as HTML');
+  };
+
+  const handleSavePdf = async () => {
+    if (!summary) return;
+    const html = generateSummaryHtml(summary, title);
+    await downloadPdfFile(`${title.replace(/\s+/g, '_')}_summary.pdf`, html);
+    toast.success('PDF opened for printing/saving');
   };
 
   if (!summary) {
@@ -253,6 +260,10 @@ export function SummaryView({ summary, title = 'Recording' }: SummaryViewProps) 
             <DropdownMenuItem onClick={handleSaveHtml}>
               <FileCode className="w-4 h-4 mr-2" />
               Save as HTML
+            </DropdownMenuItem>
+            <DropdownMenuItem onClick={handleSavePdf}>
+              <Printer className="w-4 h-4 mr-2" />
+              Save as PDF
             </DropdownMenuItem>
           </DropdownMenuContent>
         </DropdownMenu>

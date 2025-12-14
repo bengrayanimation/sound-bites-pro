@@ -11,21 +11,51 @@ import {
   Shield,
   Sparkles,
   ChevronRight,
+  Contrast,
 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Switch } from '@/components/ui/switch';
 import { useRecordingStore } from '@/stores/recordingStore';
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 
 export default function Settings() {
   const navigate = useNavigate();
   const { isPro, upgradeToPro, freeRecordingsLeft } = useRecordingStore();
   const [useCloudTranscription, setUseCloudTranscription] = useState(true);
-  const [isDarkMode, setIsDarkMode] = useState(false);
+  const [isDarkMode, setIsDarkMode] = useState(() => 
+    document.documentElement.classList.contains('dark')
+  );
+  const [isHighContrast, setIsHighContrast] = useState(() => 
+    document.documentElement.classList.contains('high-contrast')
+  );
+
+  // Initialize theme state from localStorage
+  useEffect(() => {
+    const savedHighContrast = localStorage.getItem('high-contrast') === 'true';
+    const savedDarkMode = localStorage.getItem('dark-mode') === 'true';
+    
+    if (savedHighContrast) {
+      document.documentElement.classList.add('high-contrast');
+      setIsHighContrast(true);
+    }
+    if (savedDarkMode) {
+      document.documentElement.classList.add('dark');
+      setIsDarkMode(true);
+    }
+  }, []);
 
   const toggleDarkMode = () => {
-    setIsDarkMode(!isDarkMode);
-    document.documentElement.classList.toggle('dark');
+    const newValue = !isDarkMode;
+    setIsDarkMode(newValue);
+    document.documentElement.classList.toggle('dark', newValue);
+    localStorage.setItem('dark-mode', String(newValue));
+  };
+
+  const toggleHighContrast = () => {
+    const newValue = !isHighContrast;
+    setIsHighContrast(newValue);
+    document.documentElement.classList.toggle('high-contrast', newValue);
+    localStorage.setItem('high-contrast', String(newValue));
   };
 
   return (
@@ -155,6 +185,20 @@ export default function Settings() {
                 </div>
               </div>
               <Switch checked={isDarkMode} onCheckedChange={toggleDarkMode} />
+            </div>
+            <div className="flex items-center justify-between p-4">
+              <div className="flex items-center gap-3">
+                <div className="w-10 h-10 rounded-lg bg-muted flex items-center justify-center">
+                  <Contrast className="w-5 h-5 text-muted-foreground" />
+                </div>
+                <div>
+                  <p className="font-medium text-foreground text-sm">High Contrast</p>
+                  <p className="text-xs text-muted-foreground">
+                    {isHighContrast ? 'On' : 'Off'} — For visual accessibility
+                  </p>
+                </div>
+              </div>
+              <Switch checked={isHighContrast} onCheckedChange={toggleHighContrast} />
             </div>
           </div>
         </section>

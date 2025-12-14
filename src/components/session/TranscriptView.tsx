@@ -1,6 +1,6 @@
 import { useState } from 'react';
 import { motion } from 'framer-motion';
-import { Search, FileText, Share2, Download, FileCode } from 'lucide-react';
+import { Search, FileText, Share2, Download, FileCode, Printer } from 'lucide-react';
 import { Input } from '@/components/ui/input';
 import { Button } from '@/components/ui/button';
 import {
@@ -11,7 +11,7 @@ import {
 } from '@/components/ui/dropdown-menu';
 import { TranscriptSegment } from '@/types/recording';
 import { formatTime } from '@/lib/formatters';
-import { shareText, generateTranscriptText, downloadTextFile, downloadHtmlFile, generateTranscriptHtml } from '@/lib/shareUtils';
+import { shareText, generateTranscriptText, downloadTextFile, downloadHtmlFile, generateTranscriptHtml, downloadPdfFile } from '@/lib/shareUtils';
 import { toast } from 'sonner';
 
 interface TranscriptViewProps {
@@ -42,6 +42,13 @@ export function TranscriptView({ transcript, onTimeClick, title = 'Recording' }:
     const html = generateTranscriptHtml(transcript, title);
     downloadHtmlFile(`${title.replace(/\s+/g, '_')}_transcript.html`, html);
     toast.success('Transcript saved as HTML');
+  };
+
+  const handleSavePdf = async () => {
+    if (!transcript) return;
+    const html = generateTranscriptHtml(transcript, title);
+    await downloadPdfFile(`${title.replace(/\s+/g, '_')}_transcript.pdf`, html);
+    toast.success('PDF opened for printing/saving');
   };
 
   if (!transcript || transcript.length === 0) {
@@ -124,6 +131,10 @@ export function TranscriptView({ transcript, onTimeClick, title = 'Recording' }:
             <DropdownMenuItem onClick={handleSaveHtml}>
               <FileCode className="w-4 h-4 mr-2" />
               Save as HTML
+            </DropdownMenuItem>
+            <DropdownMenuItem onClick={handleSavePdf}>
+              <Printer className="w-4 h-4 mr-2" />
+              Save as PDF
             </DropdownMenuItem>
           </DropdownMenuContent>
         </DropdownMenu>

@@ -11,6 +11,7 @@ import { Button } from '@/components/ui/button';
 import { useRecordingStore, createRecordingTemplate } from '@/stores/recordingStore';
 import { useAudioRecorder } from '@/hooks/useAudioRecorder';
 import { useTranscription } from '@/hooks/useTranscription';
+import { useRealtimeTranscription } from '@/hooks/useRealtimeTranscription';
 import { Recording } from '@/types/recording';
 import { toast } from 'sonner';
 
@@ -18,7 +19,6 @@ export default function Home() {
   const navigate = useNavigate();
   const [showPaywall, setShowPaywall] = useState(false);
   const [isProcessing, setIsProcessing] = useState(false);
-  const [liveTranscript, setLiveTranscript] = useState('');
   
   const { 
     recordings, 
@@ -47,6 +47,15 @@ export default function Home() {
     error: transcriptionError
   } = useTranscription();
 
+  const {
+    liveTranscript,
+    isTranscribing: isRealtimeTranscribing,
+    addAudioChunk,
+    startTranscribing,
+    stopTranscribing,
+    resetTranscript,
+  } = useRealtimeTranscription();
+
   const pinnedRecordings = recordings.filter((r) => r.isPinned).slice(0, 3);
 
   // Handle recording errors
@@ -62,12 +71,15 @@ export default function Home() {
     }
   }, [transcriptionError]);
 
-  // Reset live transcript when starting new recording
+  // Start/stop realtime transcription when recording starts/stops
   useEffect(() => {
     if (isRecording) {
-      setLiveTranscript('');
+      resetTranscript();
+      startTranscribing();
+    } else {
+      stopTranscribing();
     }
-  }, [isRecording]);
+  }, [isRecording, startTranscribing, stopTranscribing, resetTranscript]);
 
   // Process audio when recording stops
   useEffect(() => {
@@ -140,7 +152,7 @@ export default function Home() {
       toast.error('Failed to process recording', { id: 'transcription' });
     } finally {
       setIsProcessing(false);
-      setLiveTranscript('');
+      resetTranscript();
       resetRecorder();
     }
   };
@@ -148,6 +160,7 @@ export default function Home() {
   const handleRecordToggle = useCallback(async () => {
     if (isRecording) {
       stopRecording();
+      stopTranscribing();
     } else {
       if (!isPro && freeRecordingsLeft <= 0) {
         setShowPaywall(true);
@@ -158,10 +171,10 @@ export default function Home() {
         decrementFreeRecordings();
       }
       
-      setLiveTranscript('');
+      resetTranscript();
       await startRecording();
     }
-  }, [isRecording, isPro, freeRecordingsLeft, startRecording, stopRecording, decrementFreeRecordings]);
+  }, [isRecording, isPro, freeRecordingsLeft, startRecording, stopRecording, decrementFreeRecordings, resetTranscript, stopTranscribing]);
 
   const handleSelectRecording = (recording: Recording) => {
     navigate(`/recording/${recording.id}`);
