@@ -125,7 +125,7 @@ export default function RecordingDetail() {
             {recording.title}
           </motion.h1>
           <p className="text-sm text-muted-foreground">
-            {formatDuration(recording.duration)} • {recording.createdAt.toLocaleDateString('en-GB', {
+            {formatDuration(recording.duration)} • {new Date(recording.createdAt).toLocaleDateString('en-GB', {
               day: 'numeric',
               month: 'short',
               year: 'numeric',
