@@ -12,7 +12,6 @@ import {
 } from '@/components/ui/dropdown-menu';
 import { AudioPlayer } from '@/components/session/AudioPlayer';
 import { TranscriptView } from '@/components/session/TranscriptView';
-import { NotesView } from '@/components/session/NotesView';
 import { SummaryView } from '@/components/session/SummaryView';
 import { TranslateView } from '@/components/session/TranslateView';
 import { QuoteCardsView } from '@/components/session/QuoteCardsView';
@@ -63,14 +62,9 @@ export default function RecordingDetail() {
     updateRecording(recording.id, { quoteCards: newQuoteCards });
   };
 
-  const handleUpdateNotes = (notes: string) => {
-    updateRecording(recording.id, { notes });
-  };
-
   const tabs = [
     { value: 'audio', label: 'Audio' },
     { value: 'transcript', label: 'Transcript' },
-    { value: 'notes', label: 'Notes' },
     { value: 'summary', label: 'Summary' },
     { value: 'translate', label: 'Translate' },
     { value: 'quotes', label: 'Quotes' },
@@ -172,14 +166,6 @@ export default function RecordingDetail() {
             <TranscriptView transcript={recording.transcript} title={recording.title} />
           </TabsContent>
 
-          <TabsContent value="notes" className="mt-0 animate-fade-in">
-            <NotesView 
-              notes={recording.notes} 
-              title={recording.title}
-              onUpdateNotes={handleUpdateNotes}
-            />
-          </TabsContent>
-
           <TabsContent value="summary" className="mt-0 animate-fade-in">
             <SummaryView summary={recording.summary} title={recording.title} />
           </TabsContent>
@@ -201,7 +187,6 @@ export default function RecordingDetail() {
               highlightReel={recording.highlightReel} 
               duration={recording.duration} 
               title={recording.title}
-              transcript={recording.transcript}
               audioUrl={recording.audioUrl}
             />
           </TabsContent>

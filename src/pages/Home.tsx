@@ -1,4 +1,4 @@
-import { useState, useCallback, useEffect } from 'react';
+import { useState, useCallback, useEffect, useRef } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { motion, AnimatePresence } from 'framer-motion';
 import { Settings, Library, Loader2 } from 'lucide-react';
@@ -7,7 +7,6 @@ import { Waveform } from '@/components/Waveform';
 import { Timer } from '@/components/Timer';
 import { PinnedRecordings } from '@/components/PinnedRecordings';
 import { Paywall } from '@/components/Paywall';
-import { NotesEditor } from '@/components/NotesEditor';
 import { Button } from '@/components/ui/button';
 import { useRecordingStore, createRecordingTemplate } from '@/stores/recordingStore';
 import { useAudioRecorder } from '@/hooks/useAudioRecorder';
@@ -19,7 +18,7 @@ export default function Home() {
   const navigate = useNavigate();
   const [showPaywall, setShowPaywall] = useState(false);
   const [isProcessing, setIsProcessing] = useState(false);
-  const [recordingNotes, setRecordingNotes] = useState('');
+  const [liveTranscript, setLiveTranscript] = useState('');
   
   const { 
     recordings, 
@@ -63,6 +62,13 @@ export default function Home() {
     }
   }, [transcriptionError]);
 
+  // Reset live transcript when starting new recording
+  useEffect(() => {
+    if (isRecording) {
+      setLiveTranscript('');
+    }
+  }, [isRecording]);
+
   // Process audio when recording stops
   useEffect(() => {
     if (!isRecording && audioBase64 && duration > 0 && !isProcessing) {
@@ -88,7 +94,6 @@ export default function Home() {
       isPinned: false,
       isTranscribed: false,
       audioUrl: audioBase64,
-      notes: recordingNotes, // Save notes from recording session
     };
     
     addRecording(newRecording);
@@ -135,7 +140,7 @@ export default function Home() {
       toast.error('Failed to process recording', { id: 'transcription' });
     } finally {
       setIsProcessing(false);
-      setRecordingNotes(''); // Clear notes after saving
+      setLiveTranscript('');
       resetRecorder();
     }
   };
@@ -153,7 +158,7 @@ export default function Home() {
         decrementFreeRecordings();
       }
       
-      setRecordingNotes(''); // Reset notes for new recording
+      setLiveTranscript('');
       await startRecording();
     }
   }, [isRecording, isPro, freeRecordingsLeft, startRecording, stopRecording, decrementFreeRecordings]);
@@ -261,18 +266,31 @@ export default function Home() {
         {!isProcessing && (
           <RecordButton isRecording={isRecording} onToggle={handleRecordToggle} />
         )}
-      </main>
 
-      {/* Notes editor - shown during recording */}
-      <AnimatePresence>
-        {isRecording && (
-          <NotesEditor
-            notes={recordingNotes}
-            onNotesChange={setRecordingNotes}
-            isRecording={isRecording}
-          />
-        )}
-      </AnimatePresence>
+        {/* Live transcription display during recording */}
+        <AnimatePresence>
+          {isRecording && (
+            <motion.div
+              initial={{ opacity: 0, y: 20 }}
+              animate={{ opacity: 1, y: 0 }}
+              exit={{ opacity: 0, y: 10 }}
+              className="mt-8 w-full max-w-md px-4"
+            >
+              <div className="bg-muted/50 rounded-2xl p-4 min-h-[100px] max-h-[200px] overflow-y-auto">
+                <p className="text-sm text-muted-foreground mb-2 font-medium">Live Transcription</p>
+                <p className="text-foreground text-sm leading-relaxed">
+                  {liveTranscript || (
+                    <span className="text-muted-foreground italic flex items-center gap-2">
+                      <span className="inline-block w-2 h-2 bg-primary rounded-full animate-pulse" />
+                      Listening...
+                    </span>
+                  )}
+                </p>
+              </div>
+            </motion.div>
+          )}
+        </AnimatePresence>
+      </main>
 
       {/* Bottom navigation */}
       <nav className="fixed bottom-0 left-0 right-0 p-4 pb-8 flex justify-end">
