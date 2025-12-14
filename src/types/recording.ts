@@ -8,7 +8,6 @@ export interface Recording {
   isTranscribed: boolean;
   transcript?: TranscriptSegment[];
   chapters?: Chapter[];
-  notes?: string;
   summary?: Summary;
   quoteCards?: QuoteCard[];
   highlightReel?: HighlightReel;

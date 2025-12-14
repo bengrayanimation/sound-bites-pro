@@ -1,1 +1,13 @@
 project_id = "xheyurefppynhtfxtlls"
+
+[functions.transcribe]
+verify_jwt = false
+
+[functions.generate-ai-content]
+verify_jwt = false
+
+[functions.translate]
+verify_jwt = false
+
+[functions.realtime-transcribe]
+verify_jwt = false

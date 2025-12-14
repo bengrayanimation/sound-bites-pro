@@ -5,7 +5,6 @@ import { TranscriptSegment, Recording } from '@/types/recording';
 interface TranscriptionResult {
   transcript: TranscriptSegment[];
   chapters?: any[];
-  checkpoints?: any[];
   summary?: any;
   quoteCards?: any[];
   highlightReel?: any;
@@ -82,7 +81,6 @@ export function useTranscription() {
         console.log('AI content generated successfully');
         return {
           chapters: data.chapters,
-          checkpoints: data.checkpoints,
           summary: data.summary,
           quoteCards: data.quoteCards,
           highlightReel: data.highlightReel,

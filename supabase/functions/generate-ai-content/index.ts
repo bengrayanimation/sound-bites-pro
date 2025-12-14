@@ -41,9 +41,6 @@ Output ONLY valid JSON in this exact format:
   "chapters": [
     { "id": "c1", "title": "Chapter Title", "startTime": 0, "endTime": 60, "bullets": ["Point 1", "Point 2"], "keyQuote": "Important quote" }
   ],
-  "checkpoints": [
-    { "id": "cp1", "type": "task|decision|question|definition", "text": "Description", "timestamp": 30 }
-  ],
   "summary": {
     "executive": {
       "keyPoints": ["Point 1", "Point 2", "Point 3"],
@@ -70,10 +67,9 @@ Output ONLY valid JSON in this exact format:
 
 Rules:
 - Generate 2-4 chapters based on content flow
-- Identify 3-5 checkpoints (tasks, decisions, questions, definitions)
 - Create executive and student summaries
 - Select 3-5 best quotes for quote cards (use styles: minimal, bold, corporate, student, ocean, sunset, forest, lavender)
-- Create highlight reel with 3-5 key moments totaling ~60 seconds
+- Create highlight reel with 3-5 key moments totaling ~60 seconds max
 - All timestamps must be within the recording duration`;
         userPrompt = `Recording: "${title}"
 Duration: ${duration} seconds

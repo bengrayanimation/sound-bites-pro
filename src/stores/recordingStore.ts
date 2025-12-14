@@ -59,7 +59,6 @@ export const createRecordingTemplate = (
       keyQuote: "Wrapping up the discussion." 
     },
   ],
-  notes: '',
   summary: {
     executive: {
       keyPoints: ['Main topic discussed', 'Key insights shared', 'Important conclusions reached'],
@@ -102,7 +101,6 @@ const demoRecordings: Recording[] = [
     createdAt: new Date(Date.now() - 2 * 60 * 60 * 1000),
     isPinned: true,
     isTranscribed: true,
-    notes: '## Meeting Notes\n\n• Auth module completed by Mike\n• Dashboard in progress by Emily\n• API keys pending from DevOps\n\n> "We\'re on track for Friday deadline" - Sarah',
     transcript: [
       { id: 't1', text: "Good morning everyone. Let's start with updates from the team.", startTime: 0, endTime: 5, speaker: 'Sarah' },
       { id: 't2', text: "I finished the authentication module yesterday and ran all the unit tests.", startTime: 5, endTime: 12, speaker: 'Mike' },
@@ -179,7 +177,6 @@ const demoRecordings: Recording[] = [
     createdAt: new Date(Date.now() - 26 * 60 * 60 * 1000),
     isPinned: true,
     isTranscribed: true,
-    notes: '## Product Ideas for Q2\n\n1. AI-powered summaries - top priority\n2. Mobile redesign for Q3\n3. Export improvements\n\n> "AI-powered features will set us apart from the competition" - Product Lead\n\n**Action items:**\n• Design mockups due next week\n• Engineering spike on AI integration',
     transcript: [
       { id: 't1', text: "Let's explore new feature ideas for Q2.", startTime: 0, endTime: 4, speaker: 'Product Lead' },
       { id: 't2', text: "I've been hearing a lot of requests for AI-powered summaries.", startTime: 4, endTime: 10, speaker: 'Designer' },
