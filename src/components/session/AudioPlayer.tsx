@@ -4,7 +4,7 @@ import { Play, Pause, SkipBack, SkipForward, Volume2, Share2, Download, BookOpen
 import { Button } from '@/components/ui/button';
 import { Slider } from '@/components/ui/slider';
 import { formatTime } from '@/lib/formatters';
-import { shareText } from '@/lib/shareUtils';
+import { shareText, downloadAudioFile } from '@/lib/shareUtils';
 import { toast } from 'sonner';
 import { Chapter } from '@/types/recording';
 
@@ -150,13 +150,8 @@ export function AudioPlayer({ duration, currentTime = 0, onSeek, title = 'Record
 
   const handleSave = () => {
     if (audioUrl) {
-      const link = document.createElement('a');
-      link.href = audioUrl;
-      link.download = `${title.replace(/\s+/g, '_')}.webm`;
-      document.body.appendChild(link);
-      link.click();
-      document.body.removeChild(link);
-      toast.success('Audio saved!');
+      downloadAudioFile(audioUrl, title.replace(/\s+/g, '_'));
+      toast.success('Audio saved to device!');
     } else {
       toast.error('No audio available to save');
     }

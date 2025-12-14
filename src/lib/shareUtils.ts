@@ -101,6 +101,70 @@ export function downloadFile(filename: string, blob: Blob) {
   URL.revokeObjectURL(url);
 }
 
+// Download audio file from base64 or URL
+export function downloadAudioFile(audioUrl: string, filename: string) {
+  // Handle base64 data URLs
+  if (audioUrl.startsWith('data:')) {
+    const byteCharacters = atob(audioUrl.split(',')[1]);
+    const byteNumbers = new Array(byteCharacters.length);
+    for (let i = 0; i < byteCharacters.length; i++) {
+      byteNumbers[i] = byteCharacters.charCodeAt(i);
+    }
+    const byteArray = new Uint8Array(byteNumbers);
+    
+    // Determine mime type from data URL
+    const mimeMatch = audioUrl.match(/data:([^;]+);/);
+    const mimeType = mimeMatch ? mimeMatch[1] : 'audio/webm';
+    const extension = mimeType.includes('mp4') ? 'mp4' : mimeType.includes('wav') ? 'wav' : 'webm';
+    
+    const blob = new Blob([byteArray], { type: mimeType });
+    downloadFile(`${filename}.${extension}`, blob);
+    return;
+  }
+  
+  // Handle regular URLs
+  const a = document.createElement('a');
+  a.href = audioUrl;
+  a.download = filename;
+  document.body.appendChild(a);
+  a.click();
+  document.body.removeChild(a);
+}
+
+// Generate PDF from HTML content
+export async function downloadPdfFile(filename: string, htmlContent: string) {
+  // Create a hidden iframe to render the HTML
+  const iframe = document.createElement('iframe');
+  iframe.style.position = 'fixed';
+  iframe.style.right = '0';
+  iframe.style.bottom = '0';
+  iframe.style.width = '0';
+  iframe.style.height = '0';
+  iframe.style.border = 'none';
+  document.body.appendChild(iframe);
+  
+  const doc = iframe.contentDocument || iframe.contentWindow?.document;
+  if (!doc) {
+    document.body.removeChild(iframe);
+    throw new Error('Could not create PDF');
+  }
+  
+  doc.open();
+  doc.write(htmlContent);
+  doc.close();
+  
+  // Wait for content to render
+  await new Promise(resolve => setTimeout(resolve, 500));
+  
+  // Print to PDF using browser's print dialog
+  iframe.contentWindow?.print();
+  
+  // Clean up after a delay
+  setTimeout(() => {
+    document.body.removeChild(iframe);
+  }, 1000);
+}
+
 // Generate attractive HTML document
 export function generateTranscriptHtml(transcript: TranscriptSegment[], title: string): string {
   const segments = transcript.map(seg => `
