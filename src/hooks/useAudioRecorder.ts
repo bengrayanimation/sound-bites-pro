@@ -25,6 +25,7 @@ export function useAudioRecorder(onAudioChunk?: (audioBase64: string) => void) {
   const startTimeRef = useRef<number>(0);
   const timerRef = useRef<NodeJS.Timeout | null>(null);
   const chunkIntervalRef = useRef<NodeJS.Timeout | null>(null);
+  const isRecordingRef = useRef<boolean>(false);
 
   const startRecording = useCallback(async () => {
     try {
@@ -113,6 +114,7 @@ export function useAudioRecorder(onAudioChunk?: (audioBase64: string) => void) {
         }, 3000);
       }
 
+      isRecordingRef.current = true;
       setState(prev => ({ 
         ...prev, 
         isRecording: true, 
@@ -132,8 +134,14 @@ export function useAudioRecorder(onAudioChunk?: (audioBase64: string) => void) {
   }, [onAudioChunk]);
 
   const stopRecording = useCallback(() => {
-    if (mediaRecorderRef.current && state.isRecording) {
-      mediaRecorderRef.current.stop();
+    if (mediaRecorderRef.current && isRecordingRef.current) {
+      isRecordingRef.current = false;
+      
+      try {
+        mediaRecorderRef.current.stop();
+      } catch (e) {
+        console.error('Error stopping recorder:', e);
+      }
       
       if (streamRef.current) {
         streamRef.current.getTracks().forEach(track => track.stop());
@@ -150,7 +158,7 @@ export function useAudioRecorder(onAudioChunk?: (audioBase64: string) => void) {
         chunkIntervalRef.current = null;
       }
     }
-  }, [state.isRecording]);
+  }, []);
 
   const reset = useCallback(() => {
     if (state.audioUrl) {
