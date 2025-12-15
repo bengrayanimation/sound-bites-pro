@@ -12,7 +12,7 @@ serve(async (req) => {
   }
 
   try {
-    const { audioBase64 } = await req.json();
+    const { audioBase64, mimeType } = await req.json();
     
     if (!audioBase64) {
       console.log('No audio data received');
@@ -26,9 +26,21 @@ serve(async (req) => {
       throw new Error('LOVABLE_API_KEY is not configured');
     }
 
-    console.log('Processing audio chunk for real-time transcription...');
+    // Strip the data URI prefix to get pure base64
+    const base64Data = audioBase64.replace(/^data:audio\/[^;]+;(codecs=[^;]+;)?base64,/, '');
+    
+    // Determine audio format from mime type
+    let format = 'wav';
+    if (mimeType?.includes('webm')) {
+      format = 'webm';
+    } else if (mimeType?.includes('mp4') || mimeType?.includes('m4a')) {
+      format = 'mp4';
+    } else if (mimeType?.includes('ogg')) {
+      format = 'ogg';
+    }
 
-    // Use Gemini with inline audio data for transcription
+    console.log('Processing audio chunk, format:', format, 'data length:', base64Data.length);
+
     const response = await fetch('https://ai.gateway.lovable.dev/v1/chat/completions', {
       method: 'POST',
       headers: {
@@ -40,28 +52,20 @@ serve(async (req) => {
         messages: [
           {
             role: 'system',
-            content: `You are a precise real-time audio transcription system. Your task is to transcribe spoken words from audio chunks accurately.
-
-RULES:
-- Output ONLY the exact words spoken, nothing else
-- Do not add punctuation unless clearly indicated by speech patterns
-- Do not add descriptions, commentary, or metadata
-- If there is no speech or audio is unclear, output exactly: [silence]
-- Transcribe in the language being spoken
-- Keep transcription as a single flowing line of text`
+            content: `You are a real-time speech transcription system. Transcribe ONLY the spoken words from the audio. Output nothing if silent or unclear. No punctuation, no commentary, no brackets, no descriptions. Just the raw spoken words.`
           },
           {
             role: 'user',
             content: [
               {
                 type: 'text',
-                text: 'Transcribe the speech in this audio clip. Output only the spoken words:'
+                text: 'Transcribe:'
               },
               {
                 type: 'input_audio',
                 input_audio: {
-                  data: audioBase64.replace(/^data:audio\/[^;]+;base64,/, ''),
-                  format: 'wav'
+                  data: base64Data,
+                  format: format
                 }
               }
             ]
@@ -81,12 +85,12 @@ RULES:
     const data = await response.json();
     let text = data.choices?.[0]?.message?.content?.trim() || '';
     
-    // Filter out silence markers and empty responses
-    if (text === '[silence]' || text.toLowerCase().includes('no speech') || text.toLowerCase().includes('no audio')) {
+    // Filter out non-speech responses
+    if (text.startsWith('[') || text.toLowerCase().includes('silence') || text.toLowerCase().includes('no speech') || text.toLowerCase().includes('no audio') || text.toLowerCase().includes('inaudible')) {
       text = '';
     }
     
-    console.log('Transcribed text:', text);
+    console.log('Transcribed:', text);
 
     return new Response(JSON.stringify({ text }), {
       headers: { ...corsHeaders, 'Content-Type': 'application/json' },

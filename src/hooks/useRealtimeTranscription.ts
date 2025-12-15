@@ -16,8 +16,12 @@ export function useRealtimeTranscription() {
     
     if (audioChunk) {
       try {
+        // Extract mime type from base64 data URI
+        const mimeMatch = audioChunk.match(/^data:(audio\/[^;]+)/);
+        const mimeType = mimeMatch ? mimeMatch[1] : 'audio/webm';
+        
         const { data, error } = await supabase.functions.invoke('realtime-transcribe', {
-          body: { audioBase64: audioChunk }
+          body: { audioBase64: audioChunk, mimeType }
         });
         
         if (data?.text && !error) {
