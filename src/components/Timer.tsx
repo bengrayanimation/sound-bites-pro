@@ -1,31 +1,10 @@
-import { useEffect, useState } from 'react';
 import { motion } from 'framer-motion';
 
 interface TimerProps {
-  isRunning: boolean;
-  onTimeUpdate?: (seconds: number) => void;
+  seconds: number;
 }
 
-export function Timer({ isRunning, onTimeUpdate }: TimerProps) {
-  const [seconds, setSeconds] = useState(0);
-
-  useEffect(() => {
-    if (!isRunning) {
-      setSeconds(0);
-      return;
-    }
-
-    const interval = setInterval(() => {
-      setSeconds((s) => {
-        const newValue = s + 1;
-        onTimeUpdate?.(newValue);
-        return newValue;
-      });
-    }, 1000);
-
-    return () => clearInterval(interval);
-  }, [isRunning, onTimeUpdate]);
-
+export function Timer({ seconds }: TimerProps) {
   const formatTime = (totalSeconds: number) => {
     const hours = Math.floor(totalSeconds / 3600);
     const minutes = Math.floor((totalSeconds % 3600) / 60);

@@ -9,7 +9,7 @@ import {
   DropdownMenuTrigger,
 } from '@/components/ui/dropdown-menu';
 import { TranscriptSegment } from '@/types/recording';
-import { downloadTextFile, shareText, downloadHtmlFile, generateTranslatedHtml } from '@/lib/shareUtils';
+import { downloadTextFile, shareText, downloadHtmlFile, downloadPdfFile, generateTranslatedHtml } from '@/lib/shareUtils';
 import { formatTime } from '@/lib/formatters';
 import { toast } from 'sonner';
 import { supabase } from '@/integrations/supabase/client';
@@ -90,6 +90,14 @@ export function TranslateView({ transcript, title = 'Recording' }: TranslateView
     const html = generateTranslatedHtml(source, title, selectedLanguage.name);
     downloadHtmlFile(`${title.replace(/\s+/g, '_')}_${selectedLanguage.code}.html`, html);
     toast.success(`Translation saved as HTML (${selectedLanguage.name})`);
+  };
+
+  const handleDownloadPdf = () => {
+    const source = translatedTranscript || transcript;
+    if (!source) return;
+    const html = generateTranslatedHtml(source, title, selectedLanguage.name);
+    downloadPdfFile(`${title.replace(/\s+/g, '_')}_${selectedLanguage.code}.pdf`, html);
+    toast.success(`Translation saved as PDF (${selectedLanguage.name})`);
   };
 
   const handleShare = async () => {
@@ -218,6 +226,9 @@ export function TranslateView({ transcript, title = 'Recording' }: TranslateView
             </DropdownMenuItem>
             <DropdownMenuItem onClick={handleDownloadHtml}>
               Download as HTML
+            </DropdownMenuItem>
+            <DropdownMenuItem onClick={handleDownloadPdf}>
+              Download as PDF
             </DropdownMenuItem>
           </DropdownMenuContent>
         </DropdownMenu>

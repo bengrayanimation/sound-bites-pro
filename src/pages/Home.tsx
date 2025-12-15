@@ -31,6 +31,14 @@ export default function Home() {
   } = useRecordingStore();
 
   const {
+    liveTranscript,
+    addAudioChunk,
+    startTranscribing,
+    stopTranscribing,
+    resetTranscript,
+  } = useRealtimeTranscription();
+
+  const {
     isRecording,
     audioBase64,
     duration,
@@ -38,7 +46,7 @@ export default function Home() {
     startRecording,
     stopRecording,
     reset: resetRecorder
-  } = useAudioRecorder();
+  } = useAudioRecorder(addAudioChunk);
 
   const {
     processRecording,
@@ -46,15 +54,6 @@ export default function Home() {
     progress,
     error: transcriptionError
   } = useTranscription();
-
-  const {
-    liveTranscript,
-    isTranscribing: isRealtimeTranscribing,
-    addAudioChunk,
-    startTranscribing,
-    stopTranscribing,
-    resetTranscript,
-  } = useRealtimeTranscription();
 
   const pinnedRecordings = recordings.filter((r) => r.isPinned).slice(0, 3);
 
@@ -270,7 +269,7 @@ export default function Home() {
               className="mb-8 flex flex-col items-center gap-6"
             >
               <Waveform isAnimating={isRecording} barCount={12} />
-              <Timer isRunning={isRecording} onTimeUpdate={() => {}} />
+              <Timer seconds={duration} />
             </motion.div>
           )}
         </AnimatePresence>
