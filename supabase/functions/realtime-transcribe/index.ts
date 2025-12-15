@@ -15,6 +15,7 @@ serve(async (req) => {
     const { audioBase64 } = await req.json();
     
     if (!audioBase64) {
+      console.log('No audio data received');
       return new Response(JSON.stringify({ text: '' }), {
         headers: { ...corsHeaders, 'Content-Type': 'application/json' },
       });
@@ -25,7 +26,9 @@ serve(async (req) => {
       throw new Error('LOVABLE_API_KEY is not configured');
     }
 
-    // Use fast model for real-time transcription
+    console.log('Processing audio chunk for real-time transcription...');
+
+    // Use Gemini with inline audio data for transcription
     const response = await fetch('https://ai.gateway.lovable.dev/v1/chat/completions', {
       method: 'POST',
       headers: {
@@ -33,23 +36,32 @@ serve(async (req) => {
         'Content-Type': 'application/json',
       },
       body: JSON.stringify({
-        model: 'google/gemini-2.5-flash-lite',
+        model: 'google/gemini-2.5-flash',
         messages: [
           {
             role: 'system',
-            content: 'You are a fast audio transcription system. Transcribe the audio chunk as accurately as possible. Output ONLY the transcribed text, nothing else. If no speech is detected, output an empty string.'
+            content: `You are a precise real-time audio transcription system. Your task is to transcribe spoken words from audio chunks accurately.
+
+RULES:
+- Output ONLY the exact words spoken, nothing else
+- Do not add punctuation unless clearly indicated by speech patterns
+- Do not add descriptions, commentary, or metadata
+- If there is no speech or audio is unclear, output exactly: [silence]
+- Transcribe in the language being spoken
+- Keep transcription as a single flowing line of text`
           },
           {
             role: 'user',
             content: [
               {
                 type: 'text',
-                text: 'Transcribe this audio chunk:'
+                text: 'Transcribe the speech in this audio clip. Output only the spoken words:'
               },
               {
-                type: 'image_url',
-                image_url: {
-                  url: audioBase64
+                type: 'input_audio',
+                input_audio: {
+                  data: audioBase64.replace(/^data:audio\/[^;]+;base64,/, ''),
+                  format: 'wav'
                 }
               }
             ]
@@ -59,14 +71,22 @@ serve(async (req) => {
     });
 
     if (!response.ok) {
-      console.error('AI gateway error:', response.status);
+      const errorText = await response.text();
+      console.error('AI gateway error:', response.status, errorText);
       return new Response(JSON.stringify({ text: '' }), {
         headers: { ...corsHeaders, 'Content-Type': 'application/json' },
       });
     }
 
     const data = await response.json();
-    const text = data.choices?.[0]?.message?.content?.trim() || '';
+    let text = data.choices?.[0]?.message?.content?.trim() || '';
+    
+    // Filter out silence markers and empty responses
+    if (text === '[silence]' || text.toLowerCase().includes('no speech') || text.toLowerCase().includes('no audio')) {
+      text = '';
+    }
+    
+    console.log('Transcribed text:', text);
 
     return new Response(JSON.stringify({ text }), {
       headers: { ...corsHeaders, 'Content-Type': 'application/json' },

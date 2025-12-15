@@ -288,9 +288,9 @@ export default function Home() {
               exit={{ opacity: 0, y: 10 }}
               className="mt-8 w-full max-w-md px-4"
             >
-              <div className="bg-muted/50 rounded-2xl p-4 min-h-[100px] max-h-[200px] overflow-y-auto">
-                <p className="text-sm text-muted-foreground mb-2 font-medium">Live Transcription</p>
-                <p className="text-foreground text-sm leading-relaxed">
+              <div className="bg-muted/50 rounded-2xl p-5 min-h-[120px] max-h-[220px] overflow-y-auto">
+                <p className="text-sm text-muted-foreground mb-3 font-medium">Live Transcription</p>
+                <p className="text-foreground text-base leading-relaxed">
                   {liveTranscript || (
                     <span className="text-muted-foreground italic flex items-center gap-2">
                       <span className="inline-block w-2 h-2 bg-primary rounded-full animate-pulse" />
