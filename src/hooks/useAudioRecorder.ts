@@ -55,13 +55,43 @@ export function useAudioRecorder(onAudioChunk?: (audioBase64: string) => void) {
       const mediaRecorder = new MediaRecorder(stream, { mimeType });
       mediaRecorderRef.current = mediaRecorder;
 
-      // For real-time transcription chunks
-      let realtimeChunks: Blob[] = [];
+      // For real-time transcription chunks: send each MediaRecorder slice as-is (valid container)
+      const rtConvertQueue: Blob[] = [];
+      let rtConverting = false;
+
+      const blobToDataUrl = (blob: Blob) => new Promise<string>((resolve, reject) => {
+        const reader = new FileReader();
+        reader.onloadend = () => resolve(reader.result as string);
+        reader.onerror = () => reject(new Error('Failed to read audio chunk'));
+        reader.readAsDataURL(blob);
+      });
+
+      const drainRealtimeQueue = async () => {
+        if (!onAudioChunk || rtConverting) return;
+        rtConverting = true;
+        try {
+          while (rtConvertQueue.length > 0 && isRecordingRef.current) {
+            const next = rtConvertQueue.shift();
+            if (!next) continue;
+            const base64 = await blobToDataUrl(next);
+            onAudioChunk(base64);
+          }
+        } catch (e) {
+          console.error('Error converting realtime audio chunk:', e);
+        } finally {
+          rtConverting = false;
+        }
+      };
 
       mediaRecorder.ondataavailable = (e) => {
         if (e.data.size > 0) {
           chunksRef.current.push(e.data);
-          realtimeChunks.push(e.data);
+
+          // Push each slice for realtime transcription (about 1 line at a time)
+          if (onAudioChunk && isRecordingRef.current) {
+            rtConvertQueue.push(e.data);
+            void drainRealtimeQueue();
+          }
         }
       };
 
@@ -88,7 +118,8 @@ export function useAudioRecorder(onAudioChunk?: (audioBase64: string) => void) {
         reader.readAsDataURL(audioBlob);
       };
 
-      mediaRecorder.start(1000); // Collect data every second
+      // 1 second slices are a good balance for "as spoken" updates
+      mediaRecorder.start(1000);
       startTimeRef.current = Date.now();
 
       // Update duration every 100ms for more accurate display
@@ -97,21 +128,10 @@ export function useAudioRecorder(onAudioChunk?: (audioBase64: string) => void) {
         setState(prev => ({ ...prev, duration: elapsed }));
       }, 100);
 
-      // Send audio chunks for real-time transcription every 2 seconds (faster feedback)
-      if (onAudioChunk) {
-        chunkIntervalRef.current = setInterval(async () => {
-          if (realtimeChunks.length > 0) {
-            const chunkBlob = new Blob(realtimeChunks, { type: mimeType });
-            realtimeChunks = []; // Clear for next batch
-            
-            const reader = new FileReader();
-            reader.onloadend = () => {
-              const base64 = reader.result as string;
-              onAudioChunk(base64);
-            };
-            reader.readAsDataURL(chunkBlob);
-          }
-        }, 2000);
+      // No separate batching interval needed (we stream slices from ondataavailable)
+      if (chunkIntervalRef.current) {
+        clearInterval(chunkIntervalRef.current);
+        chunkIntervalRef.current = null;
       }
 
       isRecordingRef.current = true;

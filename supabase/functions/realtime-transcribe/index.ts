@@ -52,35 +52,29 @@ serve(async (req) => {
         messages: [
           {
             role: 'system',
-            content: `You are a precise speech-to-text transcriber. Your ONLY job is to output the exact words spoken in the audio.
+            content: `You are a real-time speech transcription system.
 
-CRITICAL RULES:
-- Output ONLY words that are CLEARLY and AUDIBLY spoken
-- If audio is silent, unclear, or contains only noise, output exactly: SILENCE
-- Do NOT guess, hallucinate, or make up words
-- Do NOT add punctuation, brackets, descriptions, or commentary
-- Do NOT output partial words or uncertain words
-- If you cannot clearly hear words, output: SILENCE
-- Be conservative: when in doubt, output SILENCE rather than guessing`
+Rules:
+- Transcribe ONLY the spoken words you actually hear.
+- If there is no clear speech, output an empty string.
+- Do NOT guess or invent words.
+- No punctuation, no brackets, no commentary.`
           },
           {
             role: 'user',
             content: [
-              {
-                type: 'text',
-                text: 'Output only the clearly spoken words from this audio, or SILENCE if none:'
-              },
+              { type: 'text', text: 'Transcribe the spoken words:' },
               {
                 type: 'input_audio',
                 input_audio: {
                   data: base64Data,
-                  format: format
-                }
-              }
-            ]
-          }
+                  format: format,
+                },
+              },
+            ],
+          },
         ],
-        temperature: 0.1,
+        temperature: 0,
       }),
     });
 
@@ -94,30 +88,13 @@ CRITICAL RULES:
 
     const data = await response.json();
     let text = data.choices?.[0]?.message?.content?.trim() || '';
-    
-    // Filter out non-speech responses and common hallucination patterns
-    const lowerText = text.toLowerCase();
-    const isNonSpeech = 
-      text === 'SILENCE' ||
-      text.startsWith('[') || 
-      text.startsWith('(') ||
-      lowerText.includes('silence') || 
-      lowerText.includes('no speech') || 
-      lowerText.includes('no audio') || 
-      lowerText.includes('inaudible') ||
-      lowerText.includes('unclear') ||
-      lowerText.includes('background') ||
-      lowerText.includes('noise') ||
-      lowerText.includes('static') ||
-      lowerText.includes('cannot hear') ||
-      lowerText.includes("can't hear") ||
-      lowerText.includes('nothing') ||
-      text.length < 2; // Filter out single characters
-    
-    if (isNonSpeech) {
-      text = '';
-    }
-    
+
+    // Basic sanitization: drop bracketed/non-speech meta.
+    if (text.startsWith('[') || text.startsWith('(')) text = '';
+
+    // Sometimes models return quotes; strip them.
+    text = text.replace(/^"|"$/g, '').trim();
+
     console.log('Transcribed:', text || '(empty)');
 
     return new Response(JSON.stringify({ text }), {
