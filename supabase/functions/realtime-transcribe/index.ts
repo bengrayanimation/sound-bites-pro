@@ -52,14 +52,23 @@ serve(async (req) => {
         messages: [
           {
             role: 'system',
-            content: `You are a real-time speech transcription system. Transcribe ONLY the spoken words from the audio. Output nothing if silent or unclear. No punctuation, no commentary, no brackets, no descriptions. Just the raw spoken words.`
+            content: `You are a precise speech-to-text transcriber. Your ONLY job is to output the exact words spoken in the audio.
+
+CRITICAL RULES:
+- Output ONLY words that are CLEARLY and AUDIBLY spoken
+- If audio is silent, unclear, or contains only noise, output exactly: SILENCE
+- Do NOT guess, hallucinate, or make up words
+- Do NOT add punctuation, brackets, descriptions, or commentary
+- Do NOT output partial words or uncertain words
+- If you cannot clearly hear words, output: SILENCE
+- Be conservative: when in doubt, output SILENCE rather than guessing`
           },
           {
             role: 'user',
             content: [
               {
                 type: 'text',
-                text: 'Transcribe:'
+                text: 'Output only the clearly spoken words from this audio, or SILENCE if none:'
               },
               {
                 type: 'input_audio',
@@ -71,6 +80,7 @@ serve(async (req) => {
             ]
           }
         ],
+        temperature: 0.1,
       }),
     });
 
@@ -85,12 +95,30 @@ serve(async (req) => {
     const data = await response.json();
     let text = data.choices?.[0]?.message?.content?.trim() || '';
     
-    // Filter out non-speech responses
-    if (text.startsWith('[') || text.toLowerCase().includes('silence') || text.toLowerCase().includes('no speech') || text.toLowerCase().includes('no audio') || text.toLowerCase().includes('inaudible')) {
+    // Filter out non-speech responses and common hallucination patterns
+    const lowerText = text.toLowerCase();
+    const isNonSpeech = 
+      text === 'SILENCE' ||
+      text.startsWith('[') || 
+      text.startsWith('(') ||
+      lowerText.includes('silence') || 
+      lowerText.includes('no speech') || 
+      lowerText.includes('no audio') || 
+      lowerText.includes('inaudible') ||
+      lowerText.includes('unclear') ||
+      lowerText.includes('background') ||
+      lowerText.includes('noise') ||
+      lowerText.includes('static') ||
+      lowerText.includes('cannot hear') ||
+      lowerText.includes("can't hear") ||
+      lowerText.includes('nothing') ||
+      text.length < 2; // Filter out single characters
+    
+    if (isNonSpeech) {
       text = '';
     }
     
-    console.log('Transcribed:', text);
+    console.log('Transcribed:', text || '(empty)');
 
     return new Response(JSON.stringify({ text }), {
       headers: { ...corsHeaders, 'Content-Type': 'application/json' },
