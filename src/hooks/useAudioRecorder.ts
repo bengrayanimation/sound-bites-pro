@@ -97,7 +97,7 @@ export function useAudioRecorder(onAudioChunk?: (audioBase64: string) => void) {
         setState(prev => ({ ...prev, duration: elapsed }));
       }, 100);
 
-      // Send audio chunks for real-time transcription every 3 seconds
+      // Send audio chunks for real-time transcription every 2 seconds (faster feedback)
       if (onAudioChunk) {
         chunkIntervalRef.current = setInterval(async () => {
           if (realtimeChunks.length > 0) {
@@ -111,7 +111,7 @@ export function useAudioRecorder(onAudioChunk?: (audioBase64: string) => void) {
             };
             reader.readAsDataURL(chunkBlob);
           }
-        }, 3000);
+        }, 2000);
       }
 
       isRecordingRef.current = true;

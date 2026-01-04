@@ -1,7 +1,7 @@
-import { useState, useCallback, useEffect, useRef } from 'react';
+import { useState, useCallback, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { motion, AnimatePresence } from 'framer-motion';
-import { Settings, Library, Loader2 } from 'lucide-react';
+import { Settings, Library, Loader2, Mic, HardDrive } from 'lucide-react';
 import { RecordButton } from '@/components/RecordButton';
 import { Waveform } from '@/components/Waveform';
 import { Timer } from '@/components/Timer';
@@ -12,6 +12,7 @@ import { useRecordingStore, createRecordingTemplate } from '@/stores/recordingSt
 import { useAudioRecorder } from '@/hooks/useAudioRecorder';
 import { useTranscription } from '@/hooks/useTranscription';
 import { useRealtimeTranscription } from '@/hooks/useRealtimeTranscription';
+import { usePermissions } from '@/hooks/usePermissions';
 import { Recording } from '@/types/recording';
 import { toast } from 'sonner';
 
@@ -19,6 +20,20 @@ export default function Home() {
   const navigate = useNavigate();
   const [showPaywall, setShowPaywall] = useState(false);
   const [isProcessing, setIsProcessing] = useState(false);
+  const [showPermissionsPrompt, setShowPermissionsPrompt] = useState(false);
+
+  const {
+    permissions,
+    isRequesting: isRequestingPermissions,
+    requestAllPermissions,
+  } = usePermissions();
+
+  // Check if we need to show permissions prompt on mount
+  useEffect(() => {
+    if (permissions.microphone === 'prompt' || permissions.microphone === 'unknown') {
+      setShowPermissionsPrompt(true);
+    }
+  }, [permissions.microphone]);
   
   const { 
     recordings, 
@@ -156,7 +171,23 @@ export default function Home() {
     }
   };
 
+  const handleRequestPermissions = useCallback(async () => {
+    const granted = await requestAllPermissions();
+    if (granted) {
+      setShowPermissionsPrompt(false);
+      toast.success('Permissions granted! You can now record.');
+    } else {
+      toast.error('Microphone access is required for recording.');
+    }
+  }, [requestAllPermissions]);
+
   const handleRecordToggle = useCallback(async () => {
+    // Check permissions first
+    if (permissions.microphone === 'denied') {
+      toast.error('Microphone access denied. Please enable it in your device settings.');
+      return;
+    }
+
     if (isRecording) {
       stopRecording();
       stopTranscribing();
@@ -173,7 +204,7 @@ export default function Home() {
       resetTranscript();
       await startRecording();
     }
-  }, [isRecording, isPro, freeRecordingsLeft, startRecording, stopRecording, decrementFreeRecordings, resetTranscript, stopTranscribing]);
+  }, [isRecording, isPro, freeRecordingsLeft, startRecording, stopRecording, decrementFreeRecordings, resetTranscript, stopTranscribing, permissions.microphone]);
 
   const handleSelectRecording = (recording: Recording) => {
     navigate(`/recording/${recording.id}`);
@@ -288,11 +319,11 @@ export default function Home() {
               exit={{ opacity: 0, y: 10 }}
               className="mt-8 w-full max-w-md px-4"
             >
-              <div className="bg-muted/50 rounded-2xl p-5 min-h-[120px] max-h-[220px] overflow-y-auto">
+              <div className="bg-muted/50 rounded-2xl p-5 min-h-[140px] max-h-[280px] overflow-y-auto">
                 <p className="text-sm text-muted-foreground mb-3 font-medium">Live Transcription</p>
-                <p className="text-foreground text-base leading-relaxed">
+                <p className="text-foreground text-2xl leading-relaxed font-medium">
                   {liveTranscript || (
-                    <span className="text-muted-foreground italic flex items-center gap-2">
+                    <span className="text-muted-foreground italic flex items-center gap-2 text-lg">
                       <span className="inline-block w-2 h-2 bg-primary rounded-full animate-pulse" />
                       Listening...
                     </span>
@@ -323,6 +354,78 @@ export default function Home() {
             onClose={() => setShowPaywall(false)}
             onUpgrade={handleUpgrade}
           />
+        )}
+      </AnimatePresence>
+
+      {/* Permissions prompt modal */}
+      <AnimatePresence>
+        {showPermissionsPrompt && permissions.microphone !== 'granted' && (
+          <motion.div
+            initial={{ opacity: 0 }}
+            animate={{ opacity: 1 }}
+            exit={{ opacity: 0 }}
+            className="fixed inset-0 bg-background/80 backdrop-blur-sm z-50 flex items-center justify-center p-6"
+          >
+            <motion.div
+              initial={{ scale: 0.95, opacity: 0 }}
+              animate={{ scale: 1, opacity: 1 }}
+              exit={{ scale: 0.95, opacity: 0 }}
+              className="bg-card border border-border rounded-3xl p-8 max-w-sm w-full shadow-xl"
+            >
+              <div className="flex flex-col items-center text-center gap-6">
+                <div className="w-16 h-16 bg-primary/10 rounded-full flex items-center justify-center">
+                  <Mic className="w-8 h-8 text-primary" />
+                </div>
+                
+                <div>
+                  <h2 className="text-xl font-bold text-foreground mb-2">
+                    Permissions Required
+                  </h2>
+                  <p className="text-muted-foreground text-sm">
+                    SoundBites needs access to your microphone to record audio, and storage to save your recordings.
+                  </p>
+                </div>
+
+                <div className="flex flex-col gap-3 w-full">
+                  <div className="flex items-center gap-3 p-3 bg-muted/50 rounded-xl">
+                    <Mic className="w-5 h-5 text-primary" />
+                    <div className="text-left">
+                      <p className="text-sm font-medium text-foreground">Microphone</p>
+                      <p className="text-xs text-muted-foreground">Record voice memos</p>
+                    </div>
+                  </div>
+                  <div className="flex items-center gap-3 p-3 bg-muted/50 rounded-xl">
+                    <HardDrive className="w-5 h-5 text-primary" />
+                    <div className="text-left">
+                      <p className="text-sm font-medium text-foreground">Storage</p>
+                      <p className="text-xs text-muted-foreground">Save recordings locally</p>
+                    </div>
+                  </div>
+                </div>
+
+                <div className="flex gap-3 w-full">
+                  <Button
+                    variant="outline"
+                    className="flex-1"
+                    onClick={() => setShowPermissionsPrompt(false)}
+                  >
+                    Later
+                  </Button>
+                  <Button
+                    className="flex-1"
+                    onClick={handleRequestPermissions}
+                    disabled={isRequestingPermissions}
+                  >
+                    {isRequestingPermissions ? (
+                      <Loader2 className="w-4 h-4 animate-spin" />
+                    ) : (
+                      'Allow Access'
+                    )}
+                  </Button>
+                </div>
+              </div>
+            </motion.div>
+          </motion.div>
         )}
       </AnimatePresence>
     </div>
