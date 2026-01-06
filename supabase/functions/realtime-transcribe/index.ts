@@ -16,7 +16,7 @@ serve(async (req) => {
     
     if (!audioBase64) {
       console.log('No audio data received');
-      return new Response(JSON.stringify({ text: '' }), {
+      return new Response(JSON.stringify({ segments: [] }), {
         headers: { ...corsHeaders, 'Content-Type': 'application/json' },
       });
     }
@@ -52,18 +52,26 @@ serve(async (req) => {
         messages: [
           {
             role: 'system',
-            content: `You are a real-time speech transcription system.
+            content: `You are a real-time speech-to-text engine with speaker diarization.
 
-Rules:
-- Transcribe ONLY the spoken words you actually hear.
-- If there is no clear speech, output an empty string.
-- Do NOT guess or invent words.
-- No punctuation, no brackets, no commentary.`
+TASK: Transcribe spoken words and identify different speakers.
+
+OUTPUT FORMAT (JSON array):
+[{"speaker": "A", "text": "Hello"}, {"speaker": "B", "text": "Hi there"}]
+
+RULES:
+- Use speaker labels A, B, C, etc. for different voices.
+- If only one speaker, use "A".
+- Output ONLY valid JSON array, nothing else.
+- If no clear speech, output: []
+- Do NOT add commentary, brackets around the JSON, or markdown.
+- Do NOT guess or hallucinate words not spoken.
+- Keep each segment short (a few words to a sentence).`
           },
           {
             role: 'user',
             content: [
-              { type: 'text', text: 'Transcribe the spoken words:' },
+              { type: 'text', text: 'Transcribe with speaker labels:' },
               {
                 type: 'input_audio',
                 input_audio: {
@@ -81,29 +89,59 @@ Rules:
     if (!response.ok) {
       const errorText = await response.text();
       console.error('AI gateway error:', response.status, errorText);
-      return new Response(JSON.stringify({ text: '' }), {
+      return new Response(JSON.stringify({ segments: [] }), {
         headers: { ...corsHeaders, 'Content-Type': 'application/json' },
       });
     }
 
     const data = await response.json();
-    let text = data.choices?.[0]?.message?.content?.trim() || '';
+    let raw = data.choices?.[0]?.message?.content?.trim() || '';
 
-    // Basic sanitization: drop bracketed/non-speech meta.
-    if (text.startsWith('[') || text.startsWith('(')) text = '';
+    console.log('Raw AI response:', raw);
 
-    // Sometimes models return quotes; strip them.
-    text = text.replace(/^"|"$/g, '').trim();
+    // Clean up response - remove markdown code blocks if present
+    raw = raw.replace(/^```json\s*/i, '').replace(/^```\s*/i, '').replace(/\s*```$/i, '').trim();
 
-    console.log('Transcribed:', text || '(empty)');
+    // Try to parse as JSON array
+    let segments: { speaker: string; text: string }[] = [];
 
-    return new Response(JSON.stringify({ text }), {
+    if (raw.startsWith('[')) {
+      try {
+        const parsed = JSON.parse(raw);
+        if (Array.isArray(parsed)) {
+          segments = parsed.filter(
+            (s: any) => s && typeof s.speaker === 'string' && typeof s.text === 'string' && s.text.trim()
+          ).map((s: any) => ({
+            speaker: s.speaker.toUpperCase(),
+            text: s.text.trim(),
+          }));
+        }
+      } catch (e) {
+        console.error('Failed to parse JSON segments:', e);
+      }
+    }
+
+    // Fallback: if we couldn't parse but there's text, treat as single speaker
+    if (segments.length === 0 && raw && !raw.startsWith('[') && !raw.startsWith('(') && !raw.startsWith('{')) {
+      // Check for hallucination patterns
+      const hallucinations = ['no speech', 'no audio', 'silence', 'inaudible', 'cannot', 'unable'];
+      const lower = raw.toLowerCase();
+      const isHallucination = hallucinations.some(h => lower.includes(h));
+      
+      if (!isHallucination && raw.length > 1) {
+        segments = [{ speaker: 'A', text: raw.replace(/^"|"$/g, '').trim() }];
+      }
+    }
+
+    console.log('Parsed segments:', segments);
+
+    return new Response(JSON.stringify({ segments }), {
       headers: { ...corsHeaders, 'Content-Type': 'application/json' },
     });
 
   } catch (error: unknown) {
     console.error('Realtime transcription error:', error);
-    return new Response(JSON.stringify({ text: '' }), {
+    return new Response(JSON.stringify({ segments: [] }), {
       headers: { ...corsHeaders, 'Content-Type': 'application/json' },
     });
   }

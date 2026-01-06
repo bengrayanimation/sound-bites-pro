@@ -20,15 +20,19 @@ function getSpeechRecognitionCtor(): SpeechCtor | null {
   return (w.SpeechRecognition || w.webkitSpeechRecognition || null) as SpeechCtor | null;
 }
 
+export interface TranscriptSegment {
+  speaker: string;
+  text: string;
+}
+
 export function useRealtimeTranscription() {
-  const [liveTranscript, setLiveTranscript] = useState<string>('');
+  const [liveSegments, setLiveSegments] = useState<TranscriptSegment[]>([]);
   const [isTranscribing, setIsTranscribing] = useState(false);
 
   // Backend fallback queue
   const transcriptionQueue = useRef<string[]>([]);
   const processingRef = useRef(false);
   const intervalRef = useRef<NodeJS.Timeout | null>(null);
-  const lastAppendedRef = useRef<string>('');
 
   // Browser speech recognition (attempted for true realtime)
   const speechRef = useRef<SpeechRecognitionLike | null>(null);
@@ -36,12 +40,6 @@ export function useRealtimeTranscription() {
   const browserAttemptActiveRef = useRef(false);
   const browserHasResultRef = useRef(false);
   const browserFallbackTimerRef = useRef<NodeJS.Timeout | null>(null);
-
-  const stopBackendPolling = useCallback(() => {
-    if (!intervalRef.current) return;
-    clearInterval(intervalRef.current);
-    intervalRef.current = null;
-  }, []);
 
   const processQueue = useCallback(async () => {
     if (processingRef.current || transcriptionQueue.current.length === 0) return;
@@ -62,10 +60,9 @@ export function useRealtimeTranscription() {
           console.error('Real-time transcription function error:', error);
         }
 
-        const newText = (data?.text || '').trim();
-        if (newText && newText !== lastAppendedRef.current) {
-          lastAppendedRef.current = newText;
-          setLiveTranscript((prev) => (prev ? `${prev} ${newText}` : newText));
+        const newSegments: TranscriptSegment[] = data?.segments || [];
+        if (newSegments.length > 0) {
+          setLiveSegments((prev) => [...prev, ...newSegments]);
         }
       } catch (err) {
         console.error('Real-time transcription error:', err);
@@ -75,18 +72,19 @@ export function useRealtimeTranscription() {
     processingRef.current = false;
   }, []);
 
-
   const startBackendPolling = useCallback(() => {
     if (intervalRef.current) return;
     intervalRef.current = setInterval(processQueue, 250);
   }, [processQueue]);
 
+  const stopBackendPolling = useCallback(() => {
+    if (!intervalRef.current) return;
+    clearInterval(intervalRef.current);
+    intervalRef.current = null;
+  }, []);
 
   const addAudioChunk = useCallback((audioBase64: string) => {
-    // IMPORTANT:
-    // - When we *attempt* browser speech recognition, we still buffer audio chunks.
-    // - If browser speech never produces results (common in Android WebViews), we can instantly
-    //   switch to backend transcription and already have chunks queued.
+    // Always buffer chunks so backend fallback has data
     transcriptionQueue.current.push(audioBase64);
   }, []);
 
@@ -135,13 +133,15 @@ export function useRealtimeTranscription() {
       }
 
       const combined = [finalTranscriptRef.current, interim].filter(Boolean).join(' ').trim();
-      setLiveTranscript(combined);
+      // Browser speech recognition doesn't support diarization; treat as single speaker
+      if (combined) {
+        setLiveSegments([{ speaker: 'A', text: combined }]);
+      }
 
       // If browser speech works, stop backend polling to save requests.
       stopBackendPolling();
       // Clear queued backend chunks so we don't append duplicate text later.
       transcriptionQueue.current = [];
-      lastAppendedRef.current = '';
     };
 
     rec.onerror = (e: any) => {
@@ -198,9 +198,8 @@ export function useRealtimeTranscription() {
 
   const startTranscribing = useCallback(() => {
     setIsTranscribing(true);
-    setLiveTranscript('');
+    setLiveSegments([]);
     transcriptionQueue.current = [];
-    lastAppendedRef.current = '';
 
     stopBackendPolling();
 
@@ -226,9 +225,8 @@ export function useRealtimeTranscription() {
   }, [processQueue, stopBackendPolling, stopBrowserSpeech]);
 
   const resetTranscript = useCallback(() => {
-    setLiveTranscript('');
+    setLiveSegments([]);
     transcriptionQueue.current = [];
-    lastAppendedRef.current = '';
     finalTranscriptRef.current = '';
   }, []);
 
@@ -245,8 +243,12 @@ export function useRealtimeTranscription() {
     };
   }, []);
 
+  // Compute a single liveTranscript string for backward compat
+  const liveTranscript = liveSegments.map(s => s.text).join(' ');
+
   return {
     liveTranscript,
+    liveSegments,
     isTranscribing,
     addAudioChunk,
     startTranscribing,
