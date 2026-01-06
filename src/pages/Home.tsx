@@ -46,7 +46,7 @@ export default function Home() {
   } = useRecordingStore();
 
   const {
-    liveTranscript,
+    liveSegments,
     addAudioChunk,
     startTranscribing,
     stopTranscribing,
@@ -321,14 +321,33 @@ export default function Home() {
             >
               <div className="bg-muted/50 rounded-2xl p-5 min-h-[140px] max-h-[280px] overflow-y-auto">
                 <p className="text-sm text-muted-foreground mb-3 font-medium">Live Transcription</p>
-                <p className="text-foreground text-2xl leading-relaxed font-medium">
-                  {liveTranscript || (
+                <div className="text-foreground text-2xl leading-relaxed font-medium space-y-2">
+                  {liveSegments.length > 0 ? (
+                    liveSegments.map((seg, idx) => (
+                      <span key={idx} className="inline">
+                        <span
+                          className={`font-bold mr-1 ${
+                            seg.speaker === 'A'
+                              ? 'text-primary'
+                              : seg.speaker === 'B'
+                              ? 'text-green-500'
+                              : seg.speaker === 'C'
+                              ? 'text-orange-500'
+                              : 'text-purple-500'
+                          }`}
+                        >
+                          {seg.speaker}:
+                        </span>
+                        <span>{seg.text} </span>
+                      </span>
+                    ))
+                  ) : (
                     <span className="text-muted-foreground italic flex items-center gap-2 text-lg">
                       <span className="inline-block w-2 h-2 bg-primary rounded-full animate-pulse" />
                       Listening...
                     </span>
                   )}
-                </p>
+                </div>
               </div>
             </motion.div>
           )}
