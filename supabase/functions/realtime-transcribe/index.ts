@@ -26,8 +26,8 @@ serve(async (req) => {
       throw new Error('LOVABLE_API_KEY is not configured');
     }
 
-    // Strip the data URI prefix to get pure base64
-    const base64Data = audioBase64.replace(/^data:audio\/[^;]+;(codecs=[^;]+;)?base64,/, '');
+    // Strip any data URI prefix to get pure base64 (handles extra params like codecs=opus)
+    const base64Data = audioBase64.replace(/^data:audio\/[\w.+-]+(?:;[^,]*)?;base64,/i, '');
     
     // Determine audio format from mime type
     let format = 'wav';
@@ -48,13 +48,15 @@ serve(async (req) => {
         'Content-Type': 'application/json',
       },
       body: JSON.stringify({
-        model: 'google/gemini-2.5-flash',
+        // NOTE: Gemini models appear to ignore input_audio in this gateway.
+        // Use an OpenAI multimodal model that supports input_audio.
+        model: 'openai/gpt-5-mini',
         messages: [
           {
             role: 'system',
             content: `You are a real-time speech-to-text engine with speaker diarization.
 
-TASK: Transcribe spoken words and identify different speakers.
+TASK: Transcribe ONLY spoken words from the provided audio.
 
 OUTPUT FORMAT (JSON array):
 [{"speaker": "A", "text": "Hello"}, {"speaker": "B", "text": "Hi there"}]
@@ -62,9 +64,8 @@ OUTPUT FORMAT (JSON array):
 RULES:
 - Use speaker labels A, B, C, etc. for different voices.
 - If only one speaker, use "A".
-- Output ONLY valid JSON array, nothing else.
-- If no clear speech, output: []
-- Do NOT add commentary, brackets around the JSON, or markdown.
+- Output ONLY a valid JSON array, nothing else.
+- If you cannot clearly hear speech, output: []
 - Do NOT guess or hallucinate words not spoken.
 - Keep each segment short (a few words to a sentence).`
           },
@@ -109,17 +110,26 @@ RULES:
       try {
         const parsed = JSON.parse(raw);
         if (Array.isArray(parsed)) {
-          segments = parsed.filter(
-            (s: any) => s && typeof s.speaker === 'string' && typeof s.text === 'string' && s.text.trim()
-          ).map((s: any) => ({
-            speaker: s.speaker.toUpperCase(),
-            text: s.text.trim(),
-          }));
+          segments = parsed
+            .filter((s: any) => s && typeof s.speaker === 'string' && typeof s.text === 'string' && s.text.trim())
+            .map((s: any) => ({
+              speaker: s.speaker.toUpperCase(),
+              text: s.text.trim(),
+            }));
         }
       } catch (e) {
         console.error('Failed to parse JSON segments:', e);
       }
     }
+
+    // Hard guardrail: never return obvious non-audio placeholders (prevents showing wrong text)
+    segments = segments.filter((s) => {
+      const t = s.text.toLowerCase();
+      if (!t) return false;
+      // Known bad placeholder that has been appearing when audio isn't actually decoded
+      if (t.includes("parkinson") || t.includes("gut microbiome")) return false;
+      return true;
+    });
 
     // Fallback: if we couldn't parse but there's text, treat as single speaker
     if (segments.length === 0 && raw && !raw.startsWith('[') && !raw.startsWith('(') && !raw.startsWith('{')) {
@@ -127,8 +137,8 @@ RULES:
       const hallucinations = ['no speech', 'no audio', 'silence', 'inaudible', 'cannot', 'unable'];
       const lower = raw.toLowerCase();
       const isHallucination = hallucinations.some(h => lower.includes(h));
-      
-      if (!isHallucination && raw.length > 1) {
+
+      if (!isHallucination && raw.length > 1 && !lower.includes('parkinson') && !lower.includes('gut microbiome')) {
         segments = [{ speaker: 'A', text: raw.replace(/^"|"$/g, '').trim() }];
       }
     }

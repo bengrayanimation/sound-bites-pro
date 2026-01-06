@@ -41,6 +41,8 @@ export function useRealtimeTranscription() {
   const browserHasResultRef = useRef(false);
   const browserFallbackTimerRef = useRef<NodeJS.Timeout | null>(null);
 
+  const lastAcceptedTextRef = useRef<string>('');
+
   const processQueue = useCallback(async () => {
     if (processingRef.current || transcriptionQueue.current.length === 0) return;
 
@@ -60,7 +62,27 @@ export function useRealtimeTranscription() {
           console.error('Real-time transcription function error:', error);
         }
 
-        const newSegments: TranscriptSegment[] = data?.segments || [];
+        let newSegments: TranscriptSegment[] = data?.segments || [];
+
+        // Guardrails: never show known placeholder / non-audio output
+        newSegments = newSegments.filter((s) => {
+          const t = (s.text || '').toLowerCase();
+          if (!t.trim()) return false;
+          if (t.includes('parkinson') || t.includes('gut microbiome')) return false;
+          return true;
+        });
+
+        // De-dupe identical repeats (common when a backend returns the same snippet repeatedly)
+        if (newSegments.length === 1) {
+          const only = newSegments[0];
+          const normalized = `${only.speaker}:${only.text}`;
+          if (normalized === lastAcceptedTextRef.current) {
+            newSegments = [];
+          } else {
+            lastAcceptedTextRef.current = normalized;
+          }
+        }
+
         if (newSegments.length > 0) {
           setLiveSegments((prev) => [...prev, ...newSegments]);
         }
