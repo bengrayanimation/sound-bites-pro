@@ -30,10 +30,18 @@ export function useRealtimeTranscription() {
   const intervalRef = useRef<NodeJS.Timeout | null>(null);
   const lastAppendedRef = useRef<string>('');
 
-  // Browser speech recognition (preferred for true realtime)
+  // Browser speech recognition (attempted for true realtime)
   const speechRef = useRef<SpeechRecognitionLike | null>(null);
-  const usingBrowserSpeechRef = useRef(false);
   const finalTranscriptRef = useRef('');
+  const browserAttemptActiveRef = useRef(false);
+  const browserHasResultRef = useRef(false);
+  const browserFallbackTimerRef = useRef<NodeJS.Timeout | null>(null);
+
+  const stopBackendPolling = useCallback(() => {
+    if (!intervalRef.current) return;
+    clearInterval(intervalRef.current);
+    intervalRef.current = null;
+  }, []);
 
   const processQueue = useCallback(async () => {
     if (processingRef.current || transcriptionQueue.current.length === 0) return;
@@ -67,9 +75,18 @@ export function useRealtimeTranscription() {
     processingRef.current = false;
   }, []);
 
+
+  const startBackendPolling = useCallback(() => {
+    if (intervalRef.current) return;
+    intervalRef.current = setInterval(processQueue, 250);
+  }, [processQueue]);
+
+
   const addAudioChunk = useCallback((audioBase64: string) => {
-    // If browser speech recognition is running, ignore audio chunks
-    if (usingBrowserSpeechRef.current) return;
+    // IMPORTANT:
+    // - When we *attempt* browser speech recognition, we still buffer audio chunks.
+    // - If browser speech never produces results (common in Android WebViews), we can instantly
+    //   switch to backend transcription and already have chunks queued.
     transcriptionQueue.current.push(audioBase64);
   }, []);
 
@@ -82,20 +99,36 @@ export function useRealtimeTranscription() {
     rec.interimResults = true;
     rec.lang = 'en-US';
 
-    usingBrowserSpeechRef.current = true;
     speechRef.current = rec;
     finalTranscriptRef.current = '';
+    browserAttemptActiveRef.current = true;
+    browserHasResultRef.current = false;
+
+    // If we get no results quickly, fall back automatically.
+    if (browserFallbackTimerRef.current) clearTimeout(browserFallbackTimerRef.current);
+    browserFallbackTimerRef.current = setTimeout(() => {
+      if (!browserHasResultRef.current && isTranscribing) {
+        console.warn('SpeechRecognition produced no results; falling back to backend realtime transcription.');
+        try {
+          rec.stop();
+        } catch {
+          // ignore
+        }
+        speechRef.current = null;
+        browserAttemptActiveRef.current = false;
+        startBackendPolling();
+      }
+    }, 1800);
 
     rec.onresult = (event: any) => {
+      browserHasResultRef.current = true;
       let interim = '';
       for (let i = event.resultIndex; i < event.results.length; i++) {
         const res = event.results[i];
         const t = (res?.[0]?.transcript || '').trim();
         if (!t) continue;
         if (res.isFinal) {
-          finalTranscriptRef.current = finalTranscriptRef.current
-            ? `${finalTranscriptRef.current} ${t}`
-            : t;
+          finalTranscriptRef.current = finalTranscriptRef.current ? `${finalTranscriptRef.current} ${t}` : t;
         } else {
           interim = interim ? `${interim} ${t}` : t;
         }
@@ -103,20 +136,36 @@ export function useRealtimeTranscription() {
 
       const combined = [finalTranscriptRef.current, interim].filter(Boolean).join(' ').trim();
       setLiveTranscript(combined);
+
+      // If browser speech works, stop backend polling to save requests.
+      stopBackendPolling();
+      // Clear queued backend chunks so we don't append duplicate text later.
+      transcriptionQueue.current = [];
+      lastAppendedRef.current = '';
     };
 
     rec.onerror = (e: any) => {
       console.error('SpeechRecognition error:', e);
+      browserAttemptActiveRef.current = false;
+      // Fall back immediately
+      if (isTranscribing) startBackendPolling();
     };
 
     rec.onend = () => {
-      // If still transcribing, restart (some browsers stop after pauses)
-      if (isTranscribing) {
-        try {
-          rec.start();
-        } catch {
-          // ignore
-        }
+      if (!isTranscribing) return;
+
+      // If speech has never yielded results, we are likely in a WebView that doesn't support it.
+      if (!browserHasResultRef.current) {
+        browserAttemptActiveRef.current = false;
+        startBackendPolling();
+        return;
+      }
+
+      // Some browsers stop after pauses; restart.
+      try {
+        rec.start();
+      } catch {
+        // ignore
       }
     };
 
@@ -125,20 +174,26 @@ export function useRealtimeTranscription() {
       return true;
     } catch (e) {
       console.error('Failed to start SpeechRecognition:', e);
-      usingBrowserSpeechRef.current = false;
       speechRef.current = null;
+      browserAttemptActiveRef.current = false;
       return false;
     }
-  }, [isTranscribing]);
+  }, [isTranscribing, startBackendPolling, stopBackendPolling]);
 
   const stopBrowserSpeech = useCallback(() => {
+    if (browserFallbackTimerRef.current) {
+      clearTimeout(browserFallbackTimerRef.current);
+      browserFallbackTimerRef.current = null;
+    }
+
     try {
       speechRef.current?.stop();
     } catch {
       // ignore
     }
     speechRef.current = null;
-    usingBrowserSpeechRef.current = false;
+    browserAttemptActiveRef.current = false;
+    browserHasResultRef.current = false;
   }, []);
 
   const startTranscribing = useCallback(() => {
@@ -147,32 +202,28 @@ export function useRealtimeTranscription() {
     transcriptionQueue.current = [];
     lastAppendedRef.current = '';
 
-    // Prefer true realtime via Web Speech API
-    const startedBrowser = startBrowserSpeech();
-    if (startedBrowser) return;
+    stopBackendPolling();
 
-    // Fallback: backend chunk transcription
-    intervalRef.current = setInterval(processQueue, 300);
-  }, [processQueue, startBrowserSpeech]);
+    const startedBrowser = startBrowserSpeech();
+    if (!startedBrowser) {
+      startBackendPolling();
+    }
+  }, [startBrowserSpeech, startBackendPolling, stopBackendPolling]);
 
   const stopTranscribing = useCallback(() => {
     setIsTranscribing(false);
 
     stopBrowserSpeech();
+    stopBackendPolling();
 
-    if (intervalRef.current) {
-      clearInterval(intervalRef.current);
-      intervalRef.current = null;
-    }
-
-    // Process remaining backend items
+    // Process any remaining backend items quickly once
     const processRemaining = async () => {
       while (transcriptionQueue.current.length > 0) {
         await processQueue();
       }
     };
-    processRemaining();
-  }, [processQueue, stopBrowserSpeech]);
+    void processRemaining();
+  }, [processQueue, stopBackendPolling, stopBrowserSpeech]);
 
   const resetTranscript = useCallback(() => {
     setLiveTranscript('');
@@ -190,6 +241,7 @@ export function useRealtimeTranscription() {
         // ignore
       }
       if (intervalRef.current) clearInterval(intervalRef.current);
+      if (browserFallbackTimerRef.current) clearTimeout(browserFallbackTimerRef.current);
     };
   }, []);
 
