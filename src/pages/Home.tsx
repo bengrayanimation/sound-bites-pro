@@ -1,7 +1,7 @@
 import { useState, useCallback, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { motion, AnimatePresence } from 'framer-motion';
-import { Settings, Library, Loader2, Mic, HardDrive } from 'lucide-react';
+import { Settings, Library, Loader2, Mic, HardDrive, MessageSquareText } from 'lucide-react';
 import { RecordButton } from '@/components/RecordButton';
 import { Waveform } from '@/components/Waveform';
 import { Timer } from '@/components/Timer';
@@ -10,6 +10,7 @@ import { Paywall } from '@/components/Paywall';
 import { Button } from '@/components/ui/button';
 import { useRecordingStore, createRecordingTemplate } from '@/stores/recordingStore';
 import { useAudioRecorder } from '@/hooks/useAudioRecorder';
+import { useConversationRecorder } from '@/hooks/useConversationRecorder';
 import { useTranscription } from '@/hooks/useTranscription';
 import { useRealtimeTranscription } from '@/hooks/useRealtimeTranscription';
 import { usePermissions } from '@/hooks/usePermissions';
@@ -21,6 +22,7 @@ export default function Home() {
   const [showPaywall, setShowPaywall] = useState(false);
   const [isProcessing, setIsProcessing] = useState(false);
   const [showPermissionsPrompt, setShowPermissionsPrompt] = useState(false);
+  const [isConversationMode, setIsConversationMode] = useState(false);
 
   const {
     permissions,
@@ -64,6 +66,14 @@ export default function Home() {
   } = useAudioRecorder(addAudioChunk);
 
   const {
+    isStreaming: isConversationStreaming,
+    duration: conversationDuration,
+    error: conversationError,
+    start: startConversation,
+    stop: stopConversation,
+  } = useConversationRecorder(addAudioChunk);
+
+  const {
     processRecording,
     isProcessing: isTranscribing,
     progress,
@@ -80,6 +90,12 @@ export default function Home() {
   }, [recorderError]);
 
   useEffect(() => {
+    if (conversationError) {
+      toast.error(conversationError);
+    }
+  }, [conversationError]);
+
+  useEffect(() => {
     if (transcriptionError) {
       toast.error(transcriptionError);
     }
@@ -91,9 +107,21 @@ export default function Home() {
       resetTranscript();
       startTranscribing();
     } else {
-      stopTranscribing();
+      // Don't stop if conversation mode is still running
+      if (!isConversationStreaming) stopTranscribing();
     }
-  }, [isRecording, startTranscribing, stopTranscribing, resetTranscript]);
+  }, [isRecording, isConversationStreaming, startTranscribing, stopTranscribing, resetTranscript]);
+
+  // Start/stop realtime transcription for conversation mode
+  useEffect(() => {
+    if (isConversationStreaming) {
+      resetTranscript();
+      startTranscribing();
+    } else {
+      if (!isRecording) stopTranscribing();
+    }
+  }, [isConversationStreaming, isRecording, startTranscribing, stopTranscribing, resetTranscript]);
+
 
   // Process audio when recording stops
   useEffect(() => {
@@ -191,20 +219,39 @@ export default function Home() {
     if (isRecording) {
       stopRecording();
       stopTranscribing();
-    } else {
-      if (!isPro && freeRecordingsLeft <= 0) {
-        setShowPaywall(true);
-        return;
-      }
-      
-      if (!isPro) {
-        decrementFreeRecordings();
-      }
-      
-      resetTranscript();
-      await startRecording();
+      return;
     }
-  }, [isRecording, isPro, freeRecordingsLeft, startRecording, stopRecording, decrementFreeRecordings, resetTranscript, stopTranscribing, permissions.microphone]);
+
+    // Don’t allow both modes simultaneously.
+    if (isConversationStreaming) {
+      stopConversation();
+      setIsConversationMode(false);
+    }
+
+    if (!isPro && freeRecordingsLeft <= 0) {
+      setShowPaywall(true);
+      return;
+    }
+
+    if (!isPro) {
+      decrementFreeRecordings();
+    }
+
+    resetTranscript();
+    await startRecording();
+  }, [
+    permissions.microphone,
+    isRecording,
+    stopRecording,
+    stopTranscribing,
+    isConversationStreaming,
+    stopConversation,
+    isPro,
+    freeRecordingsLeft,
+    decrementFreeRecordings,
+    resetTranscript,
+    startRecording,
+  ]);
 
   const handleSelectRecording = (recording: Recording) => {
     navigate(`/recording/${recording.id}`);
@@ -290,29 +337,59 @@ export default function Home() {
           </motion.div>
         )}
 
-        {/* Waveform and timer during recording */}
+        {/* Waveform and timer during recording OR conversation mode */}
         <AnimatePresence>
-          {isRecording && (
+          {(isRecording || isConversationStreaming) && (
             <motion.div
               initial={{ opacity: 0, scale: 0.9 }}
               animate={{ opacity: 1, scale: 1 }}
               exit={{ opacity: 0, scale: 0.9 }}
               className="mb-8 flex flex-col items-center gap-6"
             >
-              <Waveform isAnimating={isRecording} barCount={12} />
-              <Timer seconds={duration} />
+              <Waveform isAnimating={isRecording || isConversationStreaming} barCount={12} />
+              <Timer seconds={isRecording ? duration : conversationDuration} />
             </motion.div>
           )}
         </AnimatePresence>
 
         {/* Record button */}
         {!isProcessing && (
-          <RecordButton isRecording={isRecording} onToggle={handleRecordToggle} />
+          <div className="flex flex-col items-center gap-4">
+            <RecordButton isRecording={isRecording} onToggle={handleRecordToggle} />
+
+            <Button
+              variant={isConversationStreaming ? 'secondary' : 'outline'}
+              className="gap-2"
+              onClick={async () => {
+                // Don’t allow both modes simultaneously.
+                if (isRecording) {
+                  toast.error('Stop recording before starting conversation mode.');
+                  return;
+                }
+
+                if (permissions.microphone === 'denied') {
+                  toast.error('Microphone access denied. Please enable it in your device settings.');
+                  return;
+                }
+
+                if (isConversationStreaming) {
+                  stopConversation();
+                  setIsConversationMode(false);
+                } else {
+                  setIsConversationMode(true);
+                  await startConversation();
+                }
+              }}
+            >
+              <MessageSquareText className="w-4 h-4" />
+              {isConversationStreaming ? 'End conversation mode' : 'Conversation mode'}
+            </Button>
+          </div>
         )}
 
-        {/* Live transcription display during recording */}
+        {/* Live transcription display during recording OR conversation mode */}
         <AnimatePresence>
-          {isRecording && (
+          {(isRecording || isConversationStreaming) && (
             <motion.div
               initial={{ opacity: 0, y: 20 }}
               animate={{ opacity: 1, y: 0 }}
@@ -320,7 +397,9 @@ export default function Home() {
               className="mt-8 w-full max-w-md px-4"
             >
               <div className="bg-muted/50 rounded-2xl p-5 min-h-[140px] max-h-[280px] overflow-y-auto">
-                <p className="text-sm text-muted-foreground mb-3 font-medium">Live Transcription</p>
+                <p className="text-sm text-muted-foreground mb-3 font-medium">
+                  {isConversationStreaming ? 'Conversation Mode' : 'Live Transcription'}
+                </p>
                 <div className="text-foreground text-2xl leading-relaxed font-medium space-y-2">
                   {liveSegments.length > 0 ? (
                     liveSegments.map((seg, idx) => (
@@ -330,10 +409,10 @@ export default function Home() {
                             seg.speaker === 'A'
                               ? 'text-primary'
                               : seg.speaker === 'B'
-                              ? 'text-green-500'
-                              : seg.speaker === 'C'
-                              ? 'text-orange-500'
-                              : 'text-purple-500'
+                                ? 'text-accent-foreground'
+                                : seg.speaker === 'C'
+                                  ? 'text-destructive'
+                                  : 'text-foreground'
                           }`}
                         >
                           {seg.speaker}:
